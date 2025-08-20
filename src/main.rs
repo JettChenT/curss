@@ -1,11 +1,16 @@
 mod curius;
 
 use reqwest::Client;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     // Create a shared HTTP client
-    let client = Client::new();
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
+    let client = ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build();
 
     // Test user profile endpoint
     println!("=== Testing User Profile Endpoint ===");
@@ -52,6 +57,12 @@ async fn main() -> eyre::Result<()> {
             println!("Error fetching content: {}", e);
         }
     }
+
+    let follow_list = curius::get_follow_list(&client, user.clone(), 2).await?;
+    follow_list.iter().for_each(|f| {
+        println!("{} -- {}", f.following_user.user_link, f.order);
+    });
+    println!("Total Following: {}", follow_list.len());
 
     Ok(())
 }

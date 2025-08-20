@@ -4,7 +4,7 @@ use serde_json::Value;
 
 type UserId = i64;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Content {
     pub id: i64,
@@ -23,7 +23,7 @@ pub struct Content {
     pub user_ids: Option<Vec<UserId>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Comment {
     pub id: i64,
@@ -36,7 +36,7 @@ pub struct Comment {
     pub replies: Vec<Comment>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: i64,
@@ -46,7 +46,7 @@ pub struct User {
     pub last_online: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Highlight {
     id: i64,
@@ -62,13 +62,13 @@ pub struct Highlight {
     comment: Option<Comment>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkResponse {
     pub user_saved: Vec<Content>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FollowingUser {
     pub id: i64,
@@ -78,7 +78,14 @@ pub struct FollowingUser {
     pub last_online: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FollowWithOrder {
+    pub following_user: FollowingUser,
+    pub order: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfile {
     pub id: i64,
@@ -106,7 +113,7 @@ pub struct UserProfile {
     pub following_users: Vec<FollowingUser>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub user: UserProfile,
