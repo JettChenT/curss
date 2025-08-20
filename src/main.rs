@@ -1,31 +1,31 @@
 mod curius;
 
+use reqwest::Client;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> eyre::Result<()> {
+    // Create a shared HTTP client
+    let client = Client::new();
+
     // Test user profile endpoint
     println!("=== Testing User Profile Endpoint ===");
-    match curius::get_user_profile("justin-wang").await {
-        Ok(response) => {
-            let user = &response.user;
-            println!("Successfully fetched user profile:");
-            println!("Name: {} {}", user.first_name, user.last_name);
-            println!("User Link: {}", user.user_link);
-            println!("School: {}", user.school.as_deref().unwrap_or("N/A"));
-            println!("Twitter: {}", user.twitter.as_deref().unwrap_or("N/A"));
-            println!("Website: {}", user.website.as_deref().unwrap_or("N/A"));
-            println!("Views: {}", user.views);
-            println!("Followers: {}", user.num_followers);
-            println!("Following: {} users", user.following_users.len());
-            println!("Recent Users: {} users", user.recent_users.len());
-            println!("Last Online: {}", user.last_online);
-        }
-        Err(e) => {
-            println!("Error fetching user profile: {}", e);
-        }
-    }
+    let response = curius::get_user_profile(&client, "jett-chen").await?;
+    let user = &response.user;
+
+    println!("Successfully fetched user profile:");
+    println!("Name: {} {}", user.first_name, user.last_name);
+    println!("User Link: {}", user.user_link);
+    println!("School: {}", user.school.as_deref().unwrap_or("N/A"));
+    println!("Twitter: {}", user.twitter.as_deref().unwrap_or("N/A"));
+    println!("Website: {}", user.website.as_deref().unwrap_or("N/A"));
+    println!("Views: {}", user.views);
+    println!("Followers: {}", user.num_followers);
+    println!("Following: {} users", user.following_users.len());
+    println!("Recent Users: {} users", user.recent_users.len());
+    println!("Last Online: {}", user.last_online);
 
     println!("\n=== Testing Content Endpoint ===");
-    match curius::get_content(1578).await {
+    match curius::get_content(&client, user.id).await {
         Ok(response) => {
             println!("Successfully fetched {} items\n", response.user_saved.len());
 
@@ -52,4 +52,6 @@ async fn main() {
             println!("Error fetching content: {}", e);
         }
     }
+
+    Ok(())
 }
