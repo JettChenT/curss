@@ -10,24 +10,15 @@ const BASE_URL: &str = "https://curius.app/api/";
 const CACHE_TTL_SECONDS: u64 = 21600;
 
 use eyre::{Result, eyre};
-use redis::Client as RedisClient;
 use redis::aio::MultiplexedConnection;
 use reqwest::Response;
-use reqwest_middleware::ClientWithMiddleware;
 use serde::de::DeserializeOwned;
 
 use serde_path_to_error;
 use std::collections::HashMap;
 
+use crate::context::Context;
 use crate::curius::model::{FollowWithOrder, FollowingUser, UserProfile};
-
-/// Context object containing HTTP client and Redis connection
-#[derive(Clone)]
-pub struct Context {
-    pub http_client: ClientWithMiddleware,
-    pub redis_client: redis::Client,
-    pub redis_conn: MultiplexedConnection,
-}
 
 impl Context {
     /// Get a Redis connection from the client
@@ -152,6 +143,22 @@ pub async fn get_follow_list(
     initial_user: UserProfile,
     order: i64,
 ) -> Result<Vec<FollowWithOrder>> {
+    let cache_key = format!("follow_list:{}:{}", initial_user.id, order);
+
+    // Try to get from Redis cache first
+    let mut redis_conn = context.get_redis_connection().await?;
+
+    if let Ok(cached_data) = redis::cmd("GET")
+        .arg(&cache_key)
+        .query_async::<String>(&mut redis_conn)
+        .await
+    {
+        if let Ok(cached_response) = serde_json::from_str::<Vec<FollowWithOrder>>(&cached_data) {
+            return Ok(cached_response);
+        }
+    }
+
+    // Cache miss - compute the follow list
     let mut result: Vec<FollowWithOrder> = vec![FollowWithOrder {
         following_user: FollowingUser {
             id: initial_user.id,
@@ -205,10 +212,30 @@ pub async fn get_follow_list(
             .or_insert(follow);
     }
 
-    Ok(user_map.into_iter().map(|(_, follow)| follow).collect())
+    let final_result = user_map
+        .into_iter()
+        .map(|(_, follow)| follow)
+        .collect::<Vec<FollowWithOrder>>();
+
+    // Store in Redis cache
+    let serialized = serde_json::to_string(&final_result)
+        .map_err(|e| eyre!("Failed to serialize follow list: {}", e))?;
+
+    let _ = redis::cmd("SETEX")
+        .arg(&cache_key)
+        .arg(CACHE_TTL_SECONDS)
+        .arg(&serialized)
+        .exec_async(&mut redis_conn)
+        .await?;
+
+    Ok(final_result)
 }
 
-pub async fn fetch_feed(context: &Context, user_id: Vec<i64>) -> Result<Vec<model::Content>> {
+pub async fn fetch_feed(
+    context: &Context,
+    user_id: Vec<i64>,
+    limit: usize,
+) -> Result<Vec<model::Content>> {
     let tasks = user_id.iter().map(async |user_id| {
         let link_response = get_content(context, *user_id).await?;
         Ok::<Vec<model::Content>, eyre::Report>(link_response.user_saved)
@@ -230,5 +257,12 @@ pub async fn fetch_feed(context: &Context, user_id: Vec<i64>) -> Result<Vec<mode
     // Deduplicate by ID
     all_content.dedup_by_key(|content| content.id);
 
-    Ok(all_content)
+    // Apply limit to get the most recent n items
+    let limited_content = if all_content.len() > limit {
+        all_content.into_iter().take(limit).collect()
+    } else {
+        all_content
+    };
+
+    Ok(limited_content)
 }
