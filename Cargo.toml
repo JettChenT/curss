@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8.4", features = ["query"] }
+axum = { version = "0.8.4", features = ["query", "tracing"] }
 backon = { version = "1.5.2", features = ["tokio"] }
 redis = { version = "0.32.5", features = [
     "tokio-comp",
@@ -14,8 +14,14 @@ redis = { version = "0.32.5", features = [
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 reqwest-middleware = "0.4"
 reqwest-retry = "0.7"
-reqwest-tracing = "0.5"
+reqwest-tracing = { version = "0.5", features = ["opentelemetry_0_22"] }
 tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-core = "0.1.28"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "local-time",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_path_to_error = "0.1"
@@ -23,3 +29,18 @@ chrono = { version = "0.4.41", features = ["serde"] }
 eyre = "0.6"
 futures = "0.3.31"
 dotenvy = "0.15.7"
+# OpenTelemetry dependencies
+tracing-opentelemetry = "0.31"
+opentelemetry = "0.30"
+opentelemetry_sdk = "0.30"
+opentelemetry-stdout = "0.30"
+opentelemetry-otlp = { version = "0.30", features = [
+    "http",
+    "reqwest",
+    "grpc-tonic",
+] }
+opentelemetry-semantic-conventions = { version = "0.30", features = [
+    "semconv_experimental",
+] }
+tower-http = { version = "0.6.6", features = ["trace"] }
+deadpool-redis = { version = "0.22.0", features = ["rt_tokio_1"] }

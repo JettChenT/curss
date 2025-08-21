@@ -10,7 +10,6 @@ const BASE_URL: &str = "https://curius.app/api/";
 const CACHE_TTL_SECONDS: u64 = 21600;
 
 use eyre::{Result, eyre};
-use redis::aio::MultiplexedConnection;
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 
@@ -19,13 +18,6 @@ use std::collections::HashMap;
 
 use crate::context::Context;
 use crate::curius::model::{FollowWithOrder, FollowingUser, UserProfile};
-
-impl Context {
-    /// Get a Redis connection from the client
-    pub async fn get_redis_connection(&self) -> Result<MultiplexedConnection> {
-        Ok(self.redis_conn.clone())
-    }
-}
 
 /// Convenience function to parse JSON response with detailed path-to-error diagnostics
 async fn parse_json_response<T: DeserializeOwned>(response: Response) -> Result<T> {
@@ -56,88 +48,45 @@ async fn parse_json_response<T: DeserializeOwned>(response: Response) -> Result<
     }
 }
 
+#[tracing::instrument(skip(context))]
 pub async fn get_content(context: &Context, user_id: i64) -> Result<model::LinkResponse> {
     let cache_key = format!("content:{}", user_id);
 
-    // Try to get from Redis cache first
-    let mut redis_conn = context.get_redis_connection().await?;
+    context
+        .get_or_set_cached(&cache_key, CACHE_TTL_SECONDS, || async {
+            let url = format!("{BASE_URL}users/{user_id}/links?page=0");
+            let response = context
+                .http_client
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
 
-    if let Ok(cached_data) = redis::cmd("GET")
-        .arg(&cache_key)
-        .query_async::<String>(&mut redis_conn)
+            parse_json_response(response).await
+        })
         .await
-    {
-        if let Ok(cached_response) = serde_json::from_str::<model::LinkResponse>(&cached_data) {
-            return Ok(cached_response);
-        }
-    }
-
-    // Cache miss - make API call
-    let url = format!("{BASE_URL}users/{user_id}/links?page=0");
-    let response = context
-        .http_client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
-
-    let result = parse_json_response(response).await?;
-
-    // Store in Redis cache
-    let serialized =
-        serde_json::to_string(&result).map_err(|e| eyre!("Failed to serialize response: {}", e))?;
-
-    let _ = redis::cmd("SETEX")
-        .arg(&cache_key)
-        .arg(CACHE_TTL_SECONDS)
-        .arg(&serialized)
-        .exec_async(&mut redis_conn)
-        .await?;
-
-    Ok(result)
 }
 
+#[tracing::instrument(skip(context))]
 pub async fn get_user_profile(context: &Context, user_handle: &str) -> Result<model::UserResponse> {
     let cache_key = format!("profile:{}", user_handle);
 
-    // Try to get from Redis cache first
-    let mut redis_conn = context.get_redis_connection().await?;
+    context
+        .get_or_set_cached(&cache_key, CACHE_TTL_SECONDS, || async {
+            let url = format!("{BASE_URL}users/{user_handle}");
+            let response = context
+                .http_client
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
 
-    if let Ok(cached_data) = redis::cmd("GET")
-        .arg(&cache_key)
-        .query_async::<String>(&mut redis_conn)
+            parse_json_response(response).await
+        })
         .await
-    {
-        if let Ok(cached_response) = serde_json::from_str::<model::UserResponse>(&cached_data) {
-            return Ok(cached_response);
-        }
-    }
-
-    // Cache miss - make API call
-    let url = format!("{BASE_URL}users/{user_handle}");
-    let response = context
-        .http_client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
-
-    let result = parse_json_response(response).await?;
-
-    // Store in Redis cache
-    let serialized =
-        serde_json::to_string(&result).map_err(|e| eyre!("Failed to serialize response: {}", e))?;
-
-    let _ = redis::cmd("SETEX")
-        .arg(&cache_key)
-        .arg(CACHE_TTL_SECONDS)
-        .arg(&serialized)
-        .exec_async(&mut redis_conn)
-        .await?;
-
-    Ok(result)
 }
 
+#[tracing::instrument(skip(context))]
 pub async fn get_follow_list(
     context: &Context,
     initial_user: UserProfile,
@@ -145,20 +94,19 @@ pub async fn get_follow_list(
 ) -> Result<Vec<FollowWithOrder>> {
     let cache_key = format!("follow_list:{}:{}", initial_user.id, order);
 
-    // Try to get from Redis cache first
-    let mut redis_conn = context.get_redis_connection().await?;
-
-    if let Ok(cached_data) = redis::cmd("GET")
-        .arg(&cache_key)
-        .query_async::<String>(&mut redis_conn)
+    context
+        .get_or_set_cached(&cache_key, CACHE_TTL_SECONDS, || async {
+            compute_follow_list(context, initial_user, order).await
+        })
         .await
-    {
-        if let Ok(cached_response) = serde_json::from_str::<Vec<FollowWithOrder>>(&cached_data) {
-            return Ok(cached_response);
-        }
-    }
+}
 
-    // Cache miss - compute the follow list
+#[tracing::instrument(skip(context))]
+async fn compute_follow_list(
+    context: &Context,
+    initial_user: UserProfile,
+    order: i64,
+) -> Result<Vec<FollowWithOrder>> {
     let mut result: Vec<FollowWithOrder> = vec![FollowWithOrder {
         following_user: FollowingUser {
             id: initial_user.id,
@@ -217,38 +165,49 @@ pub async fn get_follow_list(
         .map(|(_, follow)| follow)
         .collect::<Vec<FollowWithOrder>>();
 
-    // Store in Redis cache
-    let serialized = serde_json::to_string(&final_result)
-        .map_err(|e| eyre!("Failed to serialize follow list: {}", e))?;
-
-    let _ = redis::cmd("SETEX")
-        .arg(&cache_key)
-        .arg(CACHE_TTL_SECONDS)
-        .arg(&serialized)
-        .exec_async(&mut redis_conn)
-        .await?;
-
     Ok(final_result)
 }
 
+#[tracing::instrument(skip(context))]
 pub async fn fetch_feed(
     context: &Context,
     user_id: Vec<i64>,
     limit: usize,
 ) -> Result<Vec<model::Content>> {
-    let tasks = user_id.iter().map(async |user_id| {
-        let link_response = get_content(context, *user_id).await?;
-        Ok::<Vec<model::Content>, eyre::Report>(link_response.user_saved)
-    });
-    let contents = futures::future::join_all(tasks).await;
+    // Build cache keys for all user IDs
+    let cache_keys: Vec<String> = user_id.iter().map(|id| format!("content:{}", id)).collect();
 
-    // Flatten all content vectors and collect errors
-    let mut all_content = Vec::new();
-    for result in contents {
-        match result {
-            Ok(content_vec) => all_content.extend(content_vec),
-            Err(e) => return Err(e),
+    // Try batch get from cache using MGET
+    let cached: Vec<Option<model::LinkResponse>> = context.mget_cached(&cache_keys).await?;
+
+    // Split into hits and misses, preserving association to user_id
+    let mut link_responses: Vec<model::LinkResponse> = Vec::new();
+    let mut missing_user_ids: Vec<i64> = Vec::new();
+    for (idx, maybe_resp) in cached.into_iter().enumerate() {
+        match maybe_resp {
+            Some(resp) => link_responses.push(resp),
+            None => missing_user_ids.push(user_id[idx]),
         }
+    }
+
+    // Fetch misses in parallel (each will populate cache via get_content)
+    if !missing_user_ids.is_empty() {
+        let fetch_tasks = missing_user_ids
+            .iter()
+            .map(|uid| async move { get_content(context, *uid).await });
+        let fetched = futures::future::join_all(fetch_tasks).await;
+        for item in fetched {
+            match item {
+                Ok(resp) => link_responses.push(resp),
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    // Flatten all content vectors
+    let mut all_content: Vec<model::Content> = Vec::new();
+    for lr in link_responses {
+        all_content.extend(lr.user_saved);
     }
 
     // Sort by created_date (newest first)
