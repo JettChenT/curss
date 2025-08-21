@@ -5,14 +5,36 @@ pub mod model;
 // Base URL for the Curius API
 const BASE_URL: &str = "https://curius.app/api/";
 // const BASE_URL: &str = "http://localhost:777/api/";
+
+// Redis cache TTL: 6 hours = 21600 seconds
+const CACHE_TTL_SECONDS: u64 = 21600;
+
 use eyre::{Result, eyre};
-use reqwest::{Client, Response};
+use redis::Client as RedisClient;
+use redis::aio::MultiplexedConnection;
+use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::de::DeserializeOwned;
+
 use serde_path_to_error;
 use std::collections::HashMap;
 
 use crate::curius::model::{FollowWithOrder, FollowingUser, UserProfile};
+
+/// Context object containing HTTP client and Redis connection
+#[derive(Clone)]
+pub struct Context {
+    pub http_client: ClientWithMiddleware,
+    pub redis_client: redis::Client,
+    pub redis_conn: MultiplexedConnection,
+}
+
+impl Context {
+    /// Get a Redis connection from the client
+    pub async fn get_redis_connection(&self) -> Result<MultiplexedConnection> {
+        Ok(self.redis_conn.clone())
+    }
+}
 
 /// Convenience function to parse JSON response with detailed path-to-error diagnostics
 async fn parse_json_response<T: DeserializeOwned>(response: Response) -> Result<T> {
@@ -43,36 +65,90 @@ async fn parse_json_response<T: DeserializeOwned>(response: Response) -> Result<
     }
 }
 
-pub async fn get_content(
-    client: &ClientWithMiddleware,
-    user_id: i64,
-) -> Result<model::LinkResponse> {
-    let url = format!("{BASE_URL}users/{user_id}/links?page=0");
+pub async fn get_content(context: &Context, user_id: i64) -> Result<model::LinkResponse> {
+    let cache_key = format!("content:{}", user_id);
 
-    let response = client
+    // Try to get from Redis cache first
+    let mut redis_conn = context.get_redis_connection().await?;
+
+    if let Ok(cached_data) = redis::cmd("GET")
+        .arg(&cache_key)
+        .query_async::<String>(&mut redis_conn)
+        .await
+    {
+        if let Ok(cached_response) = serde_json::from_str::<model::LinkResponse>(&cached_data) {
+            return Ok(cached_response);
+        }
+    }
+
+    // Cache miss - make API call
+    let url = format!("{BASE_URL}users/{user_id}/links?page=0");
+    let response = context
+        .http_client
         .get(&url)
         .send()
         .await
         .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
-    parse_json_response(response).await
+
+    let result = parse_json_response(response).await?;
+
+    // Store in Redis cache
+    let serialized =
+        serde_json::to_string(&result).map_err(|e| eyre!("Failed to serialize response: {}", e))?;
+
+    let _ = redis::cmd("SETEX")
+        .arg(&cache_key)
+        .arg(CACHE_TTL_SECONDS)
+        .arg(&serialized)
+        .exec_async(&mut redis_conn)
+        .await?;
+
+    Ok(result)
 }
 
-pub async fn get_user_profile(
-    client: &ClientWithMiddleware,
-    user_handle: &str,
-) -> Result<model::UserResponse> {
-    let url = format!("{BASE_URL}users/{user_handle}");
+pub async fn get_user_profile(context: &Context, user_handle: &str) -> Result<model::UserResponse> {
+    let cache_key = format!("profile:{}", user_handle);
 
-    let response = client
+    // Try to get from Redis cache first
+    let mut redis_conn = context.get_redis_connection().await?;
+
+    if let Ok(cached_data) = redis::cmd("GET")
+        .arg(&cache_key)
+        .query_async::<String>(&mut redis_conn)
+        .await
+    {
+        if let Ok(cached_response) = serde_json::from_str::<model::UserResponse>(&cached_data) {
+            return Ok(cached_response);
+        }
+    }
+
+    // Cache miss - make API call
+    let url = format!("{BASE_URL}users/{user_handle}");
+    let response = context
+        .http_client
         .get(&url)
         .send()
         .await
         .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
-    parse_json_response(response).await
+
+    let result = parse_json_response(response).await?;
+
+    // Store in Redis cache
+    let serialized =
+        serde_json::to_string(&result).map_err(|e| eyre!("Failed to serialize response: {}", e))?;
+
+    let _ = redis::cmd("SETEX")
+        .arg(&cache_key)
+        .arg(CACHE_TTL_SECONDS)
+        .arg(&serialized)
+        .exec_async(&mut redis_conn)
+        .await?;
+
+    Ok(result)
 }
 
 pub async fn get_follow_list(
-    client: &ClientWithMiddleware,
+    context: &Context,
     initial_user: UserProfile,
     order: i64,
 ) -> Result<Vec<FollowWithOrder>> {
@@ -93,8 +169,8 @@ pub async fn get_follow_list(
         .following_users
         .iter()
         .map(async |user| {
-            let user_detail = get_user_profile(client, &user.user_link).await?;
-            let mut follow_list = get_follow_list(client, user_detail.user, order - 1).await?;
+            let user_detail = get_user_profile(context, &user.user_link).await?;
+            let mut follow_list = get_follow_list(context, user_detail.user, order - 1).await?;
             follow_list.iter_mut().for_each(|follow| {
                 follow.order += 1;
             });
