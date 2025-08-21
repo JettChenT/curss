@@ -9,6 +9,7 @@ use axum::{
     extract::{Query, State},
 };
 use axum::{http::StatusCode, response::IntoResponse};
+use rss_gen::{RssData, RssVersion, generate_rss};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,6 +24,22 @@ pub struct FeedRequest {
     order: i64,
     #[serde(default = "default_limit")]
     limit: usize,
+    #[serde(default)]
+    format: FeedFormat,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum FeedFormat {
+    #[serde(rename = "json")]
+    Json,
+    #[serde(rename = "rss")]
+    Rss,
+}
+
+impl Default for FeedFormat {
+    fn default() -> Self {
+        Self::Json
+    }
 }
 
 fn default_limit() -> usize {
@@ -79,18 +96,30 @@ async fn get_follow_list_inner(
 pub async fn get_feed(
     State(ctx): State<Context>,
     Query(req): Query<FeedRequest>,
-) -> Result<Json<Vec<Content>>, AppError> {
+) -> Result<Response, AppError> {
     tracing::info!("Getting feed for user");
-    let feed = get_feed_inner(&ctx, req).await?;
-    tracing::info!(content_count = %feed.0.len(), "Retrieved feed content");
-    Ok(feed)
+    let feed = get_feed_inner(&ctx, &req).await?;
+    tracing::info!(content_count = %feed.len(), "Retrieved feed content");
+    match &req.format {
+        FeedFormat::Json => Ok(Json(feed).into_response()),
+        FeedFormat::Rss => {
+            let mut rss_feed = RssData::new(Some(RssVersion::RSS2_0))
+                .title(format!("{}'s network({} order) feed", &req.user_handle, &req.order))
+                .description(format!("The curius network feed for {} and their connections within the network(distance <= {})", &req.user_handle, &req.order))
+                .link(format!("https://curius.app/{}", &req.user_handle));
+            for content in feed {
+                rss_feed.add_item(content.to_rss_item());
+            }
+            match generate_rss(&rss_feed) {
+                Ok(rss) => Ok(rss.into_response()),
+                Err(e) => Err(e.into()),
+            }
+        }
+    }
 }
 
 #[tracing::instrument(skip(ctx))]
-async fn get_feed_inner(
-    ctx: &Context,
-    req: FeedRequest,
-) -> Result<Json<Vec<Content>>, eyre::Report> {
+async fn get_feed_inner(ctx: &Context, req: &FeedRequest) -> Result<Vec<Content>, eyre::Report> {
     // Validate limit doesn't exceed maximum allowed value
     let limit = std::cmp::min(req.limit, 500);
     tracing::info!(validated_limit = %limit, "Validated and adjusted feed limit");
@@ -117,5 +146,5 @@ async fn get_feed_inner(
     let feed = curius::fetch_feed(&ctx, user_ids, limit).await?;
     tracing::info!(feed_items = %feed.len(), "Retrieved feed content from curius");
 
-    Ok(Json(feed))
+    Ok(feed)
 }

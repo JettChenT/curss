@@ -1,6 +1,7 @@
 // Curius API Client
 
 pub mod model;
+mod rss;
 
 // Base URL for the Curius API
 const BASE_URL: &str = "https://curius.app/api/";
