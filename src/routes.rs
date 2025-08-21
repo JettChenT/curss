@@ -104,7 +104,7 @@ pub async fn get_feed(
         FeedFormat::Json => Ok(Json(feed).into_response()),
         FeedFormat::Rss => {
             let mut rss_feed = RssData::new(Some(RssVersion::RSS2_0))
-                .title(format!("{}'s network({} order) feed", &req.user_handle, &req.order))
+                .title(format!("Curius - {} - {} order feed", &req.user_handle, &req.order))
                 .description(format!("The curius network feed for {} and their connections within the network(distance <= {})", &req.user_handle, &req.order))
                 .link(format!("https://curius.app/{}", &req.user_handle));
             for content in feed {
