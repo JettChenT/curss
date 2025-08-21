@@ -56,7 +56,9 @@ async fn main() -> eyre::Result<()> {
                 println!("=== Item {} ===", i + 1);
                 println!("Title: {}", content.title);
                 println!("Link: {}", content.link);
-                println!("Snippet: {}", content.snippet);
+                if let Some(snippet) = &content.snippet {
+                    println!("Snippet: {}", snippet);
+                }
                 println!("Favorite: {}", content.favorite);
                 println!("Created: {}", content.created_date);
                 if let Some(to_read) = content.to_read {
@@ -81,6 +83,44 @@ async fn main() -> eyre::Result<()> {
         println!("{} -- {}", f.following_user.user_link, f.order);
     });
     println!("Total Following: {}", follow_list.len());
+
+    // Create user IDs from the follow list
+    let mut user_ids: Vec<i64> = follow_list.iter().map(|f| f.following_user.id).collect();
+
+    // Add current user ID to the list
+    user_ids.push(user.id);
+
+    println!("Total unique user IDs for feed: {}", user_ids.len());
+
+    println!("\n=== Testing Feed Fetch ===");
+    if user_ids.is_empty() {
+        println!("No user IDs found, skipping feed fetch");
+    } else {
+        match curius::fetch_feed(&context, user_ids).await {
+            Ok(feed_content) => {
+                let total_items = feed_content.len();
+                let items_to_show = feed_content.iter().take(100).collect::<Vec<_>>();
+
+                println!("Successfully fetched {} total items from feed", total_items);
+                println!(
+                    "Showing the most recent {} items (sorted by timestamp, deduplicated):",
+                    items_to_show.len()
+                );
+
+                for (i, content) in items_to_show.iter().enumerate() {
+                    println!("=== Feed Item {} ===", i + 1);
+                    println!("Title: {}", content.title);
+                    println!("Link: {}", content.link);
+                    println!("Created: {}", content.created_date);
+                    println!("ID: {}", content.id);
+                    println!();
+                }
+            }
+            Err(e) => {
+                println!("Error fetching feed: {}", e);
+            }
+        }
+    }
 
     Ok(())
 }

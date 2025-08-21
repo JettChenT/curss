@@ -11,7 +11,7 @@ pub struct Content {
     pub link: String,
     pub title: String,
     pub favorite: bool,
-    pub snippet: String,
+    pub snippet: Option<String>,
     pub to_read: Option<bool>,
     pub created_by: Option<UserId>,
     pub created_date: String,
@@ -33,7 +33,7 @@ pub struct Comment {
     pub text: String,
     pub created_date: DateTime<Utc>,
     pub modified_date: DateTime<Utc>,
-    pub replies: Vec<Comment>,
+    pub replies: Option<Vec<Comment>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

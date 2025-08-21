@@ -207,3 +207,28 @@ pub async fn get_follow_list(
 
     Ok(user_map.into_iter().map(|(_, follow)| follow).collect())
 }
+
+pub async fn fetch_feed(context: &Context, user_id: Vec<i64>) -> Result<Vec<model::Content>> {
+    let tasks = user_id.iter().map(async |user_id| {
+        let link_response = get_content(context, *user_id).await?;
+        Ok::<Vec<model::Content>, eyre::Report>(link_response.user_saved)
+    });
+    let contents = futures::future::join_all(tasks).await;
+
+    // Flatten all content vectors and collect errors
+    let mut all_content = Vec::new();
+    for result in contents {
+        match result {
+            Ok(content_vec) => all_content.extend(content_vec),
+            Err(e) => return Err(e),
+        }
+    }
+
+    // Sort by created_date (newest first)
+    all_content.sort_by(|a, b| b.created_date.cmp(&a.created_date));
+
+    // Deduplicate by ID
+    all_content.dedup_by_key(|content| content.id);
+
+    Ok(all_content)
+}
