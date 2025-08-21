@@ -9,7 +9,7 @@ use axum::{
     extract::{Query, State},
 };
 use axum::{http::StatusCode, response::IntoResponse};
-use rss_gen::{RssData, RssVersion, generate_rss};
+use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,17 +103,13 @@ pub async fn get_feed(
     match &req.format {
         FeedFormat::Json => Ok(Json(feed).into_response()),
         FeedFormat::Rss => {
-            let mut rss_feed = RssData::new(Some(RssVersion::RSS2_0))
+            let rss_feed = ChannelBuilder::default()
                 .title(format!("Curius - {} - {} order feed", &req.user_handle, &req.order))
                 .description(format!("The curius network feed for {} and their connections within the network(distance <= {})", &req.user_handle, &req.order))
-                .link(format!("https://curius.app/{}", &req.user_handle));
-            for content in feed {
-                rss_feed.add_item(content.to_rss_item());
-            }
-            match generate_rss(&rss_feed) {
-                Ok(rss) => Ok(rss.into_response()),
-                Err(e) => Err(e.into()),
-            }
+                .link(format!("https://curius.app/{}", &req.user_handle))
+                .items(feed.iter().map(|content| content.clone().to_rss_item()).collect::<Result<Vec<Item>, eyre::Report>>()?)
+                .build();
+            Ok(rss_feed.to_string().into_response())
         }
     }
 }
@@ -134,16 +130,9 @@ async fn get_feed_inner(ctx: &Context, req: &FeedRequest) -> Result<Vec<Content>
     let follow_list = curius::get_follow_list(&ctx, user_profile.user, req.order).await?;
     tracing::info!(following_count = %follow_list.len(), "Retrieved follow list");
 
-    // Extract user IDs from the follow list
-    let user_ids: Vec<i64> = follow_list
-        .into_iter()
-        .map(|follow| follow.following_user.id)
-        .collect();
-    tracing::info!(user_ids_count = %user_ids.len(), "Extracted user IDs from follow list");
-
     // Fetch feed for these users with limit
     tracing::info!("Fetching feed content");
-    let feed = curius::fetch_feed(&ctx, user_ids, limit).await?;
+    let feed = curius::fetch_feed(&ctx, follow_list, limit).await?;
     tracing::info!(feed_items = %feed.len(), "Retrieved feed content from curius");
 
     Ok(feed)

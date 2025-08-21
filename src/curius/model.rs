@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-type UserId = i64;
+pub type UserId = i64;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +21,10 @@ pub struct Content {
     #[serde(default)]
     pub highlights: Vec<Highlight>,
     pub user_ids: Option<Vec<UserId>>,
+
+    // Field not in API response but added after post processing
+    pub saved_by: Option<Vec<FollowWithOrder>>,
+    // TODO: potentially, all highlights
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,4 +121,16 @@ pub struct UserProfile {
 #[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub user: UserProfile,
+}
+
+impl Into<FollowingUser> for UserProfile {
+    fn into(self) -> FollowingUser {
+        FollowingUser {
+            id: self.id,
+            first_name: self.first_name,
+            last_name: self.last_name,
+            user_link: self.user_link,
+            last_online: self.last_online,
+        }
+    }
 }

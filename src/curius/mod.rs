@@ -18,7 +18,7 @@ use serde_path_to_error;
 use std::collections::HashMap;
 
 use crate::context::Context;
-use crate::curius::model::{FollowWithOrder, FollowingUser, UserProfile};
+use crate::curius::model::{FollowWithOrder, FollowingUser, UserId, UserProfile};
 
 /// Convenience function to parse JSON response with detailed path-to-error diagnostics
 async fn parse_json_response<T: DeserializeOwned>(response: Response) -> Result<T> {
@@ -172,22 +172,25 @@ async fn compute_follow_list(
 #[tracing::instrument(skip(context))]
 pub async fn fetch_feed(
     context: &Context,
-    user_id: Vec<i64>,
+    follow_list: Vec<FollowWithOrder>,
     limit: usize,
 ) -> Result<Vec<model::Content>> {
     // Build cache keys for all user IDs
-    let cache_keys: Vec<String> = user_id.iter().map(|id| format!("content:{}", id)).collect();
+    let cache_keys: Vec<String> = follow_list
+        .iter()
+        .map(|follow| format!("content:{}", follow.following_user.id))
+        .collect();
 
     // Try batch get from cache using MGET
     let cached: Vec<Option<model::LinkResponse>> = context.mget_cached(&cache_keys).await?;
 
     // Split into hits and misses, preserving association to user_id
-    let mut link_responses: Vec<model::LinkResponse> = Vec::new();
+    let mut link_responses: Vec<(UserId, model::LinkResponse)> = Vec::new();
     let mut missing_user_ids: Vec<i64> = Vec::new();
     for (idx, maybe_resp) in cached.into_iter().enumerate() {
         match maybe_resp {
-            Some(resp) => link_responses.push(resp),
-            None => missing_user_ids.push(user_id[idx]),
+            Some(resp) => link_responses.push((follow_list[idx].following_user.id, resp)),
+            None => missing_user_ids.push(follow_list[idx].following_user.id),
         }
     }
 
@@ -195,7 +198,7 @@ pub async fn fetch_feed(
     if !missing_user_ids.is_empty() {
         let fetch_tasks = missing_user_ids
             .iter()
-            .map(|uid| async move { get_content(context, *uid).await });
+            .map(|uid| async move { get_content(context, *uid).await.map(|resp| (*uid, resp)) });
         let fetched = futures::future::join_all(fetch_tasks).await;
         for item in fetched {
             match item {
@@ -206,9 +209,27 @@ pub async fn fetch_feed(
     }
 
     // Flatten all content vectors
+    let mut follow_list_map: HashMap<UserId, FollowWithOrder> = HashMap::new();
+    for follow in follow_list {
+        follow_list_map.insert(follow.following_user.id, follow);
+    }
     let mut all_content: Vec<model::Content> = Vec::new();
-    for lr in link_responses {
-        all_content.extend(lr.user_saved);
+    // Initially populate the saved_by field for each content field
+    for lr in link_responses.iter_mut() {
+        lr.1.user_saved.iter_mut().for_each(|saved| {
+            saved.saved_by = Some(vec![follow_list_map.get(&lr.0).unwrap().clone()]);
+        });
+        all_content.extend(lr.1.user_saved.clone());
+    }
+
+    let mut content_saved_map: HashMap<i64, Vec<FollowWithOrder>> = HashMap::new();
+    for content in all_content.iter() {
+        if let Some(saved_by) = content.saved_by.clone() {
+            content_saved_map
+                .entry(content.id)
+                .or_insert(vec![])
+                .extend(saved_by);
+        }
     }
 
     // Sort by created_date (newest first)
@@ -216,6 +237,14 @@ pub async fn fetch_feed(
 
     // Deduplicate by ID
     all_content.dedup_by_key(|content| content.id);
+    all_content.iter_mut().for_each(|content| {
+        content.saved_by = Some(
+            content_saved_map
+                .get(&content.id)
+                .map(|saved| saved.clone())
+                .unwrap_or(vec![]),
+        );
+    });
 
     // Apply limit to get the most recent n items
     let limited_content = if all_content.len() > limit {
