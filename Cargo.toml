@@ -45,3 +45,4 @@ opentelemetry-semantic-conventions = { version = "0.30", features = [
 tower-http = { version = "0.6.6", features = ["trace"] }
 deadpool-redis = { version = "0.22.0", features = ["rt_tokio_1"] }
 rss = "2.0"
+config = "0.15.14"

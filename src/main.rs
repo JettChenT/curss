@@ -1,7 +1,8 @@
+mod conf;
 mod context;
 mod curius;
-mod otel;
 mod routes;
+mod telemetry;
 
 use axum::{Router, routing::get};
 use context::Context;
@@ -84,7 +85,7 @@ async fn main() -> eyre::Result<()> {
     dotenvy::dotenv().ok();
 
     // Initialize OpenTelemetry tracing
-    let _guard = otel::init_tracing_subscriber();
+    let _guard = telemetry::init_tracing_subscriber();
 
     foo().await;
     server().await?;
