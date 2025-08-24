@@ -34,8 +34,8 @@ export function useSearchUsers(
 
   const trimmedQuery = query?.trim() ?? "";
   const results: Array<User> = useMemo(() => {
-    if (!trimmedQuery) return users;
     const limit = options?.limit ?? 20;
+    if (!trimmedQuery) return users.slice(0, limit);
     return fuse.search(trimmedQuery, { limit }).map((m) => m.item);
   }, [fuse, users, trimmedQuery, options?.limit]);
 

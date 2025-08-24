@@ -38,7 +38,6 @@ function App() {
   })
 
   const showSuggestions = useMemo(() => {
-    if (!search.trim()) return false
     if (selectedUser && (selectedUser.firstName + ' ' + selectedUser.lastName).toLowerCase() === search.trim().toLowerCase()) {
       return false
     }
