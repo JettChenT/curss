@@ -9,6 +9,7 @@ const API_BASE_URL = (RAW_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, "
 
 export const api = ky.create({
   prefixUrl: API_BASE_URL,
+  timeout: 120_000,
 });
 
 type IntegerLike = number | bigint | string;
@@ -67,6 +68,18 @@ export async function getFeed(
     return api.get("feed", { searchParams }).text();
   }
   return api.get("feed", { searchParams }).json<Array<Content>>();
+}
+
+export function buildFeedUrl(params: FeedQueryBase): string {
+  const format: FeedFormat = params.format ?? "json";
+  const searchParams: Record<string, string> = {
+    user_handle: params.user_handle,
+    order: toStringInt(params.order),
+    ...(typeof params.limit === "number" ? { limit: String(params.limit) } : {}),
+    format,
+  };
+  const qs = new URLSearchParams(searchParams).toString();
+  return `${API_BASE_URL}/feed?${qs}`;
 }
 
 export default api;
