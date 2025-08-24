@@ -1,5 +1,5 @@
 import './App.css'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { useSearchUsers } from '@/lib/hooks/use-search-users'
@@ -15,8 +15,12 @@ function App() {
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [degree, setDegree] = useState<number>(1)
+  const [activeIndex, setActiveIndex] = useState<number>(-1)
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
 
   const { results: userResults, isLoading: usersLoading } = useSearchUsers(search, { limit: 8 })
+
+  const suggestionListRef = useRef<HTMLUListElement | null>(null)
 
   const userHandle = selectedUser?.userLink
 
@@ -38,6 +42,21 @@ function App() {
     }
     return true
   }, [search, selectedUser])
+
+  const shouldShowSuggestions = showSuggestions && isSearchFocused
+
+  useEffect(() => {
+    if (activeIndex < 0) return
+    const el = suggestionListRef.current?.children?.[activeIndex] as HTMLElement | undefined
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex])
+
+  function selectUser(u: User) {
+    setSelectedUser(u)
+    setSearch(`${u.firstName} ${u.lastName}`)
+    setIsSearchFocused(false)
+    setActiveIndex(-1)
+  }
 
   return (
     <div className="p-4">
@@ -92,23 +111,47 @@ function App() {
               <Input
                 placeholder="Search users..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setActiveIndex(-1)
+                }}
+                onKeyDown={(e) => {
+                  if (!shouldShowSuggestions) return
+                  const items = usersLoading ? [] : userResults
+                  if (items.length === 0) return
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setActiveIndex((idx) => (idx + 1) % items.length)
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setActiveIndex((idx) => (idx <= 0 ? items.length - 1 : idx - 1))
+                  } else if (e.key === 'Enter') {
+                    if (activeIndex >= 0 && activeIndex < items.length) {
+                      e.preventDefault()
+                      selectUser(items[activeIndex]!)
+                    }
+                  } else if (e.key === 'Escape') {
+                    setIsSearchFocused(false)
+                  }
+                }}
               />
-              {showSuggestions && (
+              {shouldShowSuggestions && (
                 <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-sm">
-                  <ul className="max-h-64 overflow-auto text-sm">
+                  <ul ref={suggestionListRef} className="max-h-64 overflow-auto text-sm">
                     {usersLoading ? (
                       <li className="p-2 text-muted-foreground">Searching...</li>
                     ) : userResults.length === 0 ? (
                       <li className="p-2 text-muted-foreground">No results</li>
                     ) : (
-                      userResults.map((u) => (
+                      userResults.map((u, idx) => (
                         <li
                           key={String(u.id)}
-                          className="cursor-pointer px-3 py-2 hover:bg-accent"
-                          onClick={() => {
-                            setSelectedUser(u)
-                            setSearch(`${u.firstName} ${u.lastName}`)
+                          className={`cursor-pointer px-3 py-2 hover:bg-accent ${idx === activeIndex ? 'bg-accent' : ''}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            selectUser(u)
                           }}
                         >
                           <div className="font-medium">{u.firstName} {u.lastName}</div>
