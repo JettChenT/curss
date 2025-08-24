@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+# Project Structure and Entry Points
+
+- Backend (Rust Axum) lives at `src/`. The main entry is `src/main.rs` which initializes telemetry (`src/telemetry.rs`), builds shared `Context` (`src/context.rs`), and mounts HTTP routes from `src/routes.rs`.
+- Domain logic for Curius API is under `src/curius/` with `mod.rs` as the client façade, models in `model.rs`, and RSS helpers in `rss.rs`.
+- Frontend (React + Vite) lives at `frontend/`. The Vite config is `frontend/vite.config.ts`, entry is `frontend/src/main.tsx`, and API utilities are in `frontend/src/lib/api.ts`.
+- Type bindings are generated via `ts-rs` in Rust and consumed by the frontend under `frontend/src/lib/bindings/`.
+
+Key files:
+- `src/main.rs` – server bootstrap, router, CORS/Trace layers
+- `src/routes.rs` – handlers for `/`, `/all-users`, `/follow-list`, `/feed`
+- `src/context.rs` – shared HTTP client and Redis pool; cache helpers (`get_cached`, `mget_cached`, `get_or_set_cached`)
+- `src/curius/mod.rs` – Curius API client (BASE_URL at top) + fetch/compose/cache
+- `frontend/src/lib/api.ts` – browser client; `VITE_API_BASE_URL` env, ky instance
+
+Local dev defaults:
+- Backend listens on `0.0.0.0:3000`.
+- Frontend expects API at `http://localhost:3000` unless `VITE_API_BASE_URL` is set.
+
+Build/Run:
+- Backend: `cargo run` (ensure `REDIS_URL` if not default `redis://localhost:6379`).
+- Frontend: `bun run dev` in `frontend/` (uses Vite).
+

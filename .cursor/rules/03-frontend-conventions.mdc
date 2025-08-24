@@ -1,0 +1,27 @@
+---
+globs: frontend/**/*.{ts,tsx}
+description: Frontend conventions for Vite, React, API client, and env
+---
+# Frontend Conventions (React + Vite)
+
+- Module alias `@` resolves to `frontend/src` per [`frontend/vite.config.ts`](mdc:frontend/vite.config.ts).
+- API base URL is read from `VITE_API_BASE_URL` with fallback to `http://localhost:3000`; see [`frontend/src/lib/api.ts`](mdc:frontend/src/lib/api.ts).
+- Use the shared ky client `api` from `frontend/src/lib/api.ts` for requests.
+- Types for network responses come from `frontend/src/lib/bindings/` generated via `ts-rs` in the Rust codebase.
+
+Networking patterns:
+- `getAllUsers()` → `GET /all-users` returns `{ users: User[] }`.
+- `getFollowList({ user_handle, order })` → `GET /follow-list?user_handle=...&order=...` returns `FollowWithOrder[]`.
+- `getFeed({... , format })` →
+  - `format: 'json'` returns `Content[]`.
+  - `format: 'rss'` returns RSS XML string.
+- Use `buildFeedUrl(params)` to construct shareable links (RSS/JSON) without firing a request.
+
+Environment:
+- Place `VITE_API_BASE_URL` in a `.env` or `.env.local` at `frontend/` root when pointing to non-default API hosts.
+
+Lint/Build:
+- Dev: `bun run dev` inside `frontend/`.
+- Build: `bun run build` inside `frontend/`.
+- Preview: `bun run preview`.
+

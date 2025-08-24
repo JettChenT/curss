@@ -1,0 +1,22 @@
+---
+description: Document backend endpoints, query parameters, and response types bridged to frontend
+---
+# API Contracts
+
+Base: Backend listens on `http://localhost:3000`.
+
+Endpoints:
+- `GET /` → health text "Hello, World!".
+- `GET /all-users` → JSON `{ users: User[] }`.
+- `GET /follow-list` → query: `user_handle: string`, `order: number`; returns `FollowWithOrder[]`.
+- `GET /feed` → query: `user_handle: string`, `order: number`, `limit?: number (<= 500)`, `format?: 'json' | 'rss'`.
+  - `format='json'` → returns `Content[]`.
+  - `format='rss'` → returns RSS XML string.
+
+Types are defined in Rust (`src/curius/model.rs`) and exported to TS using `ts-rs` with `#[ts(export)]`. Frontend consumes the generated counterparts in `frontend/src/lib/bindings/`.
+
+Notes:
+- `limit` defaults to 50 if absent; server clamps to max 500.
+- `order` is the network distance for follow graph traversal.
+- RSS items include `Saved by` attribution when available.
+
