@@ -17,6 +17,8 @@ function App() {
   const [degree, setDegree] = useState<number>(1)
   const [activeIndex, setActiveIndex] = useState<number>(-1)
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
+  const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { results: userResults, isLoading: usersLoading } = useSearchUsers(search, { limit: 8 })
 
@@ -51,6 +53,14 @@ function App() {
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
+
   function selectUser(u: User) {
     setSelectedUser(u)
     setSearch(`${u.firstName} ${u.lastName}`)
@@ -59,53 +69,60 @@ function App() {
   }
 
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-12 gap-4 h-[calc(100vh-2rem)]">
+    <div className="p-4 h-full min-h-0">
+      <div className="grid grid-cols-12 gap-4 h-full min-h-0">
         {/* Left: Feed (larger) */}
-        <div className="col-span-12 md:col-span-8 space-y-3 h-full overflow-auto pr-1">
-          {!selectedUser ? (
-            <div className="text-sm text-muted-foreground">Select a user to view their feed.</div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">Feed for {selectedUser.firstName} {selectedUser.lastName} ({selectedUser.userLink})</div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (!userHandle) return
-                  const url = buildFeedUrl({ user_handle: userHandle, order: degree, limit: 50, format: 'rss' })
-                  try {
-                    await navigator.clipboard.writeText(url)
-                  } catch {
-                    const el = document.createElement('textarea')
-                    el.value = url
-                    document.body.appendChild(el)
-                    el.select()
-                    document.execCommand('copy')
-                    document.body.removeChild(el)
-                  }
-                }}
-              >
-                Copy RSS
-              </Button>
-            </div>
-          )}
-
-          {selectedUser && (
-            feedLoading ? (
-              <div className="text-sm text-muted-foreground">Loading feed…</div>
-            ) : !feed || feed.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No items.</div>
+        <div className="col-span-12 md:col-span-8 h-full min-h-0 pr-1 flex flex-col">
+          <div className="shrink-0">
+            {!selectedUser ? (
+              <div className="text-sm text-muted-foreground">Select a user to view their feed.</div>
             ) : (
-              feed.map((item) => (
-                <FeedItem key={String(item.id)} item={item} />
-              ))
-            )
-          )}
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">Feed for {selectedUser.firstName} {selectedUser.lastName} ({selectedUser.userLink})</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (!userHandle) return
+                    const url = buildFeedUrl({ user_handle: userHandle, order: degree, limit: 50, format: 'rss' })
+                    try {
+                      await navigator.clipboard.writeText(url)
+                    } catch {
+                      const el = document.createElement('textarea')
+                      el.value = url
+                      document.body.appendChild(el)
+                      el.select()
+                      document.execCommand('copy')
+                      document.body.removeChild(el)
+                    }
+                    setCopied(true)
+                    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+                    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
+                  }}
+                >
+                  {copied ? 'Copied!' : 'Copy RSS'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 flex-1 min-h-0 overflow-auto space-y-3">
+            {selectedUser && (
+              feedLoading ? (
+                <div className="text-sm text-muted-foreground">Loading feed…</div>
+              ) : !feed || feed.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No items.</div>
+              ) : (
+                feed.map((item) => (
+                  <FeedItem key={String(item.id)} item={item} />
+                ))
+              )
+            )}
+          </div>
         </div>
 
         {/* Right: Controls + Follow list */}
-        <div className="col-span-12 md:col-span-4 space-y-4">
+        <div className="col-span-12 md:col-span-4 h-full min-h-0 space-y-4">
           <div className="space-y-3">
             <div className="relative w-full">
               <Input
@@ -169,10 +186,10 @@ function App() {
               <div className="flex-1">
                 <Slider
                   min={1}
-                  max={3}
+                  max={2}
                   step={1}
-                  value={[degree]}
-                  onValueChange={(v) => setDegree(v?.[0] ?? 1)}
+                  value={[Math.min(2, Math.max(1, degree))]}
+                  onValueChange={(v) => setDegree(Math.min(2, Math.max(1, v?.[0] ?? 1)))}
                 />
               </div>
               <div className="text-sm tabular-nums w-6 text-center">{degree}</div>
@@ -181,7 +198,7 @@ function App() {
 
           {selectedUser && (
             <div>
-              <div className="mb-2 text-sm text-muted-foreground">{`Follow list (${degree}°)`}</div>
+              <div className="mb-2 text-sm text-muted-foreground">{`Follow list (${degree}°${!followsLoading ? ` • ${follows?.length ?? 0}` : ''})`}</div>
               {followsLoading ? (
                 <div className="text-sm text-muted-foreground">Loading follows…</div>
               ) : (
