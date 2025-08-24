@@ -17,7 +17,7 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use reqwest_tracing::TracingMiddleware as ReqwestTracingMiddleware;
 use routes::{get_all_users, get_feed, get_follow_list};
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 #[tracing::instrument]
 async fn foo() {
@@ -70,6 +70,7 @@ async fn server() -> eyre::Result<()> {
         .route("/all-users", get(get_all_users))
         .route("/follow-list", get(get_follow_list))
         .route("/feed", get(get_feed))
+        .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(context);
 

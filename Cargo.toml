@@ -42,7 +42,7 @@ opentelemetry-otlp = { version = "0.30", features = [
 opentelemetry-semantic-conventions = { version = "0.30", features = [
     "semconv_experimental",
 ] }
-tower-http = { version = "0.6.6", features = ["trace"] }
+tower-http = { version = "0.6.6", features = ["trace", "cors"] }
 deadpool-redis = { version = "0.22.0", features = ["rt_tokio_1"] }
 rss = "2.0"
 config = "0.15.14"
