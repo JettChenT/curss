@@ -46,3 +46,9 @@ tower-http = { version = "0.6.6", features = ["trace"] }
 deadpool-redis = { version = "0.22.0", features = ["rt_tokio_1"] }
 rss = "2.0"
 config = "0.15.14"
+ts-rs = { version = "10.1", features = [
+    "serde-json-impl",
+    "chrono-impl",
+    "tokio-impl",
+    "uuid-impl",
+] }

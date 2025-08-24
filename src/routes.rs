@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::curius::{
     self,
-    model::{Content, FollowWithOrder},
+    model::{AllUsersResponse, Content, FollowWithOrder},
 };
 use axum::response::Response;
 use axum::{
@@ -9,16 +9,19 @@ use axum::{
     extract::{Query, State},
 };
 use axum::{http::StatusCode, response::IntoResponse};
-use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
+use rss::{ChannelBuilder, Item};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct FollowListRequest {
     user_handle: String,
     order: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct FeedRequest {
     user_handle: String,
     order: i64,
@@ -28,7 +31,8 @@ pub struct FeedRequest {
     format: FeedFormat,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub enum FeedFormat {
     #[serde(rename = "json")]
     Json,
@@ -136,4 +140,18 @@ async fn get_feed_inner(ctx: &Context, req: &FeedRequest) -> Result<Vec<Content>
     tracing::info!(feed_items = %feed.len(), "Retrieved feed content from curius");
 
     Ok(feed)
+}
+
+#[tracing::instrument(skip(ctx))]
+pub async fn get_all_users(State(ctx): State<Context>) -> Result<Json<AllUsersResponse>, AppError> {
+    let users = get_all_users_inner(&ctx).await?;
+    Ok(users)
+}
+
+#[tracing::instrument(skip(ctx))]
+async fn get_all_users_inner(ctx: &Context) -> Result<Json<AllUsersResponse>, eyre::Report> {
+    tracing::info!("Getting all users");
+    let all_users = curius::get_all_users(&ctx).await?;
+    tracing::info!(user_count = %all_users.users.len(), "Retrieved all users");
+    Ok(Json(all_users))
 }

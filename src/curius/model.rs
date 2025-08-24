@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ts_rs::TS;
 
 pub type UserId = i64;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Content {
     pub id: i64,
     pub link: String,
@@ -27,8 +29,9 @@ pub struct Content {
     // TODO: potentially, all highlights
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Comment {
     pub id: i64,
     pub user_id: UserId,
@@ -40,8 +43,9 @@ pub struct Comment {
     pub replies: Option<Vec<Comment>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct User {
     pub id: i64,
     pub first_name: String,
@@ -50,8 +54,9 @@ pub struct User {
     pub last_online: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Highlight {
     id: i64,
     user_id: UserId,
@@ -66,14 +71,16 @@ pub struct Highlight {
     comment: Option<Comment>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct LinkResponse {
     pub user_saved: Vec<Content>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct FollowingUser {
     pub id: i64,
     pub first_name: String,
@@ -82,15 +89,17 @@ pub struct FollowingUser {
     pub last_online: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct FollowWithOrder {
     pub following_user: FollowingUser,
     pub order: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct UserProfile {
     pub id: i64,
     pub first_name: String,
@@ -117,10 +126,17 @@ pub struct UserProfile {
     pub following_users: Vec<FollowingUser>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct UserResponse {
     pub user: UserProfile,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AllUsersResponse {
+    pub users: Vec<User>,
 }
 
 impl Into<FollowingUser> for UserProfile {

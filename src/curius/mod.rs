@@ -255,3 +255,16 @@ pub async fn fetch_feed(
 
     Ok(limited_content)
 }
+
+#[tracing::instrument(skip(context))]
+pub async fn get_all_users(context: &Context) -> Result<model::AllUsersResponse> {
+    let url = format!("{BASE_URL}users/all");
+    let response = context
+        .http_client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| eyre!("Failed to send request: {:?}", e))?;
+
+    parse_json_response(response).await
+}
