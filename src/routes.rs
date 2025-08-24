@@ -47,7 +47,7 @@ impl Default for FeedFormat {
 }
 
 fn default_limit() -> usize {
-    50
+    100
 }
 
 pub struct AppError(eyre::Report);

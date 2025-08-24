@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { getFeed } from "../api";
 import type { Content } from "../bindings/Content";
 
@@ -20,6 +20,8 @@ export function useFeed(params: UseFeedParams) {
         format: "json",
       }),
     enabled: Boolean(user_handle),
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 }
 

@@ -19,6 +19,9 @@ function App() {
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
   const [copied, setCopied] = useState(false)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [feedLimit, setFeedLimit] = useState<number>(100)
+  const feedContainerRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const { results: userResults, isLoading: usersLoading } = useSearchUsers(search, { limit: 8 })
 
@@ -26,11 +29,35 @@ function App() {
 
   const userHandle = selectedUser?.userLink
 
-  const { data: feed, isLoading: feedLoading } = useFeed({
+  const { data: feed, isLoading: feedLoading, isFetching: feedFetching, isStale } = useFeed({
     user_handle: userHandle,
     order: degree,
-    limit: 50,
+    limit: feedLimit,
   })
+  // Reset feed limit when user or degree changes
+  useEffect(() => {
+    setFeedLimit(100)
+  }, [userHandle, degree])
+
+  const hasMore = Boolean(feed && feed.length >= feedLimit && feedLimit < 500)
+
+  // Infinite scroll: bump limit when bottom sentinel enters view
+  useEffect(() => {
+    const root = feedContainerRef.current
+    const sentinel = sentinelRef.current
+    if (!root || !sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry?.isIntersecting && hasMore && !feedFetching) {
+          setFeedLimit((l) => Math.min(l + 100, 500))
+        }
+      },
+      { root, rootMargin: '0px 0px 200px 0px', threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, feedFetching, selectedUser, degree])
 
   const { data: follows, isLoading: followsLoading } = useFollowList({
     user_handle: userHandle,
@@ -78,43 +105,59 @@ function App() {
             ) : (
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">Feed for {selectedUser.firstName} {selectedUser.lastName} ({selectedUser.userLink})</div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (!userHandle) return
-                    const url = buildFeedUrl({ user_handle: userHandle, order: degree, limit: 50, format: 'rss' })
-                    try {
-                      await navigator.clipboard.writeText(url)
-                    } catch {
-                      const el = document.createElement('textarea')
-                      el.value = url
-                      document.body.appendChild(el)
-                      el.select()
-                      document.execCommand('copy')
-                      document.body.removeChild(el)
-                    }
-                    setCopied(true)
-                    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
-                    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
-                  }}
-                >
-                  {copied ? 'Copied!' : 'Copy RSS'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {(feedLoading || feedFetching ) && (
+                    <span
+                      className="inline-block h-2 w-2 rounded-full bg-yellow-400 animate-pulse"
+                      title="Updating feed"
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!userHandle) return
+                      const url = buildFeedUrl({ user_handle: userHandle, order: degree, limit: feedLimit, format: 'rss' })
+                      try {
+                        await navigator.clipboard.writeText(url)
+                      } catch {
+                        const el = document.createElement('textarea')
+                        el.value = url
+                        document.body.appendChild(el)
+                        el.select()
+                        document.execCommand('copy')
+                        document.body.removeChild(el)
+                      }
+                      setCopied(true)
+                      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+                      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
+                    }}
+                  >
+                    {copied ? 'Copied!' : 'Copy RSS'}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="mt-3 flex-1 min-h-0 overflow-auto space-y-3">
+          <div ref={feedContainerRef} className="mt-3 flex-1 min-h-0 overflow-auto space-y-3">
             {selectedUser && (
               feedLoading ? (
                 <div className="text-sm text-muted-foreground">Loading feed…</div>
               ) : !feed || feed.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No items.</div>
               ) : (
-                feed.map((item) => (
-                  <FeedItem key={String(item.id)} item={item} />
-                ))
+                <>
+                  {feed.map((item) => (
+                    <FeedItem key={String(item.id)} item={item} />
+                  ))}
+                  <div ref={sentinelRef} />
+                  {hasMore && (
+                    <div className="py-2 text-center text-sm text-muted-foreground">
+                      {feedFetching ? 'Loading more…' : 'Scroll to load more'}
+                    </div>
+                  )}
+                </>
               )
             )}
           </div>
