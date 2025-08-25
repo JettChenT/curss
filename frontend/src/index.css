@@ -3,6 +3,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Berkeley Mono fonts */
+@font-face {
+  font-family: "Berkeley Mono";
+  src: url("@assets/BerkeleyMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Berkeley Mono";
+  src: url("@assets/BerkeleyMono-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Berkeley Mono";
+  src: url("@assets/BerkeleyMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Berkeley Mono";
+  src: url("@assets/BerkeleyMono-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -42,7 +75,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.3rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -123,6 +156,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     overflow: hidden;
   }
 }
