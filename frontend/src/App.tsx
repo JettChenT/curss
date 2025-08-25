@@ -29,7 +29,7 @@ function App() {
 
   const userHandle = selectedUser?.userLink
 
-  const { data: feed, isLoading: feedLoading, isFetching: feedFetching, isStale } = useFeed({
+  const { data: feed, isLoading: feedLoading, isFetching: feedFetching } = useFeed({
     user_handle: userHandle,
     order: degree,
     limit: feedLimit,
