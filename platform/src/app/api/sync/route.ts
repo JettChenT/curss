@@ -39,8 +39,8 @@ async function runSync() {
   };
 }
 
-// POST handler for manual triggers
-export async function POST() {
+// GET handler for Vercel cron jobs
+export async function GET() {
   const isAuthed = await verifyAuth();
   if (!isAuthed) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

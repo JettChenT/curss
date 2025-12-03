@@ -59,6 +59,8 @@ export const syncDB = () =>
     // Process a single user
     const processUser = (user: (typeof needUpdateUsers)[number]) =>
       Effect.tryPromise(async () => {
+        const isNewUser = user.id > maxId;
+
         // Fetch user profile
         const { user: profile } = await Effect.runPromise(
           api
@@ -121,6 +123,11 @@ export const syncDB = () =>
         }
 
         // Process links - upsert each link and saved_link relationship
+        // Count links modified after maxTimestamp as new
+        const newLinksCount = allLinks.filter(
+          (link) => new Date(link.modifiedDate) > maxTimestamp,
+        ).length;
+
         for (const link of allLinks) {
           // Upsert link
           await db
@@ -138,13 +145,18 @@ export const syncDB = () =>
             .onConflictDoNothing();
         }
 
-        return { success: true };
+        return { success: true, isNewUser, newLinksCount };
       }).pipe(
-        Effect.tap(() =>
+        Effect.tap((result) =>
           Effect.sync(() => {
             processed++;
+            const userStatus = result.isNewUser ? "🆕 NEW" : "📝";
+            const linksInfo =
+              result.newLinksCount > 0
+                ? ` (+${result.newLinksCount} links)`
+                : "";
             console.log(
-              `[${processed}/${needUpdateUsers.length}] Synced ${user.firstName} ${user.lastName}`,
+              `[${processed}/${needUpdateUsers.length}] ${userStatus} ${user.firstName} ${user.lastName}${linksInfo}`,
             );
           }),
         ),

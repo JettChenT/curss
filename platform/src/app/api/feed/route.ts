@@ -82,7 +82,11 @@ export async function GET(request: NextRequest) {
     })
     .from(linksTable)
     .$dynamic()
-    .where(targetUserIds.length > 0 ? inArray(linksTable.createdBy, targetUserIds) : undefined)
+    .where(
+      targetUserIds.length > 0
+        ? inArray(linksTable.createdBy, targetUserIds)
+        : undefined,
+    )
     .orderBy(desc(linksTable.modifiedDate))
     .limit(limit);
 
