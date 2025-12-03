@@ -10,13 +10,13 @@ export type UseFeedParams = {
 };
 
 async function getFeed(params: {
-  user_handle: string;
+  user_handle?: string;
   order: number;
   limit?: number;
 }): Promise<Content[]> {
   const searchParams = new URLSearchParams({
-    user_handle: params.user_handle,
     order: String(params.order),
+    ...(params.user_handle ? { user_handle: params.user_handle } : {}),
     ...(params.limit ? { limit: String(params.limit) } : {}),
   });
   const res = await fetch(`/api/feed?${searchParams}`);
@@ -27,14 +27,13 @@ async function getFeed(params: {
 export function useFeed(params: UseFeedParams) {
   const { user_handle, order, limit } = params;
   return useQuery<Content[]>({
-    queryKey: ["feed", user_handle, order, limit],
+    queryKey: ["feed", user_handle ?? "global", order, limit],
     queryFn: () =>
       getFeed({
-        user_handle: user_handle!,
+        user_handle,
         order,
         limit,
       }),
-    enabled: Boolean(user_handle),
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
   });

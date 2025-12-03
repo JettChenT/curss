@@ -44,4 +44,3 @@ export type Content = {
 export type AllUsersResponse = {
   users: User[];
 };
-

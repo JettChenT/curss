@@ -43,6 +43,7 @@ export default function Home() {
   });
 
   // Reset feed limit when user or degree changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on userHandle/degree change
   useEffect(() => {
     setFeedLimit(100);
   }, [userHandle, degree]);
@@ -65,7 +66,7 @@ export default function Home() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, feedFetching, selectedUser, degree]);
+  }, [hasMore, feedFetching]);
 
   const { data: follows, isLoading: followsLoading } = useFollowList({
     user_handle: userHandle,
@@ -132,55 +133,54 @@ export default function Home() {
         {/* Left: Feed (larger) */}
         <div className="col-span-12 md:col-span-8 h-full min-h-0 pr-1 flex flex-col">
           <div className="shrink-0">
-            {!selectedUser ? (
+            <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Select a user to view their feed.
+                {selectedUser ? (
+                  <>
+                    Feed for {selectedUser.firstName} {selectedUser.lastName} (
+                    {selectedUser.userLink})
+                  </>
+                ) : (
+                  <>Global Feed</>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Feed for {selectedUser.firstName} {selectedUser.lastName} (
-                  {selectedUser.userLink})
-                </div>
-                <div className="flex items-center gap-2">
-                  {(feedLoading || feedFetching) && (
-                    <span
-                      className="inline-block h-2 w-2 rounded-full bg-yellow-400 animate-pulse"
-                      title="Updating feed"
-                    />
-                  )}
+              <div className="flex items-center gap-2">
+                {(feedLoading || feedFetching) && (
+                  <span
+                    className="inline-block h-2 w-2 rounded-full bg-yellow-400 animate-pulse"
+                    title="Updating feed"
+                  />
+                )}
+                {selectedUser && (
                   <Button variant="outline" size="sm" onClick={handleCopyRss}>
                     {copied ? "Copied!" : "Copy RSS"}
                   </Button>
-                </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <div
             ref={feedContainerRef}
             className="mt-3 flex-1 min-h-0 overflow-auto space-y-3"
           >
-            {selectedUser &&
-              (feedLoading ? (
-                <div className="text-sm text-muted-foreground">
-                  Loading feed…
-                </div>
-              ) : !feed || feed.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No items.</div>
-              ) : (
-                <>
-                  {feed.map((item) => (
-                    <FeedItem key={String(item.id)} item={item} />
-                  ))}
-                  <div ref={sentinelRef} />
-                  {hasMore && (
-                    <div className="py-2 text-center text-sm text-muted-foreground">
-                      {feedFetching ? "Loading more…" : "Scroll to load more"}
-                    </div>
-                  )}
-                </>
-              ))}
+            {feedLoading ? (
+              <div className="text-sm text-muted-foreground">Loading feed…</div>
+            ) : !feed || feed.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No items.</div>
+            ) : (
+              <>
+                {feed.map((item) => (
+                  <FeedItem key={String(item.id)} item={item} />
+                ))}
+                <div ref={sentinelRef} />
+                {hasMore && (
+                  <div className="py-2 text-center text-sm text-muted-foreground">
+                    {feedFetching ? "Loading more…" : "Scroll to load more"}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -210,9 +210,14 @@ export default function Home() {
                       idx <= 0 ? items.length - 1 : idx - 1,
                     );
                   } else if (e.key === "Enter") {
-                    if (activeIndex >= 0 && activeIndex < items.length) {
+                    const selectedItem = items[activeIndex];
+                    if (
+                      activeIndex >= 0 &&
+                      activeIndex < items.length &&
+                      selectedItem
+                    ) {
                       e.preventDefault();
-                      selectUser(items[activeIndex]!);
+                      selectUser(selectedItem);
                     }
                   } else if (e.key === "Escape") {
                     setIsSearchFocused(false);
@@ -261,12 +266,12 @@ export default function Home() {
               </div>
               <div className="flex-1">
                 <Slider
-                  min={1}
+                  min={0}
                   max={2}
                   step={1}
-                  value={[Math.min(2, Math.max(1, degree))]}
+                  value={[Math.min(2, Math.max(0, degree))]}
                   onValueChange={(v) =>
-                    setDegree(Math.min(2, Math.max(1, v?.[0] ?? 1)))
+                    setDegree(Math.min(2, Math.max(0, v?.[0] ?? 1)))
                   }
                 />
               </div>
@@ -276,7 +281,7 @@ export default function Home() {
             </div>
           </div>
 
-          {selectedUser && (
+          {selectedUser && degree > 0 && (
             <div>
               <div className="mb-2 text-sm text-muted-foreground">{`Follow list (${degree}°${!followsLoading ? ` • ${follows?.length ?? 0}` : ""})`}</div>
               {followsLoading ? (

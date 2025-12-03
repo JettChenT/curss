@@ -16,54 +16,58 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10), 500);
   const format = searchParams.get("format") ?? "json";
 
-  if (!userHandle) {
-    return NextResponse.json(
-      { error: "user_handle is required" },
-      { status: 400 },
-    );
+  let firstDegreeIds: number[] = [];
+  let targetUserIds: number[] = [];
+
+  // If no user_handle, return global feed (all recent links)
+  if (userHandle) {
+    // Find user by handle
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.userLink, userHandle))
+      .limit(1);
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // If order === 0, show only the user's own links
+    if (order === 0) {
+      targetUserIds = [user.id];
+    } else {
+      // Get 1st degree follows
+      const firstDegreeFollows = await db
+        .select({ followingId: followsTable.followingId })
+        .from(followsTable)
+        .where(eq(followsTable.followerId, user.id));
+
+      firstDegreeIds = firstDegreeFollows.map((f) => f.followingId);
+
+      if (firstDegreeIds.length === 0) {
+        return NextResponse.json([]);
+      }
+
+      // Collect all user IDs we want content from
+      targetUserIds = [...firstDegreeIds];
+
+      // If order >= 2, include 2nd degree follows
+      if (order >= 2) {
+        const secondDegreeFollows = await db
+          .select({ followingId: followsTable.followingId })
+          .from(followsTable)
+          .where(inArray(followsTable.followerId, firstDegreeIds));
+
+        const secondDegreeIds = [
+          ...new Set(secondDegreeFollows.map((f) => f.followingId)),
+        ].filter((id) => id !== user.id && !firstDegreeIds.includes(id));
+
+        targetUserIds = [...targetUserIds, ...secondDegreeIds];
+      }
+    }
   }
 
-  // Find user by handle
-  const [user] = await db
-    .select({ id: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.userLink, userHandle))
-    .limit(1);
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  // Get 1st degree follows
-  const firstDegreeFollows = await db
-    .select({ followingId: followsTable.followingId })
-    .from(followsTable)
-    .where(eq(followsTable.followerId, user.id));
-
-  const firstDegreeIds = firstDegreeFollows.map((f) => f.followingId);
-
-  if (firstDegreeIds.length === 0) {
-    return NextResponse.json([]);
-  }
-
-  // Collect all user IDs we want content from
-  let targetUserIds = [...firstDegreeIds];
-
-  // If order >= 2, include 2nd degree follows
-  if (order >= 2) {
-    const secondDegreeFollows = await db
-      .select({ followingId: followsTable.followingId })
-      .from(followsTable)
-      .where(inArray(followsTable.followerId, firstDegreeIds));
-
-    const secondDegreeIds = [
-      ...new Set(secondDegreeFollows.map((f) => f.followingId)),
-    ].filter((id) => id !== user.id && !firstDegreeIds.includes(id));
-
-    targetUserIds = [...targetUserIds, ...secondDegreeIds];
-  }
-
-  // Get all links created by target users, ordered by modified date
+  // Get links - either filtered by target users or global (all links)
   const links = await db
     .select({
       id: linksTable.id,
@@ -77,7 +81,8 @@ export async function GET(request: NextRequest) {
       metadata: linksTable.metadata,
     })
     .from(linksTable)
-    .where(inArray(linksTable.createdBy, targetUserIds))
+    .$dynamic()
+    .where(targetUserIds.length > 0 ? inArray(linksTable.createdBy, targetUserIds) : undefined)
     .orderBy(desc(linksTable.modifiedDate))
     .limit(limit);
 

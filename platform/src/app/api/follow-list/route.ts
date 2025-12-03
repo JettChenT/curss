@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!userHandle) {
     return NextResponse.json(
       { error: "user_handle is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -107,4 +107,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(result);
 }
-
