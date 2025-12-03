@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { FetchHttpClient } from "@effect/platform";
-import { CuriusAPIService } from "../src/lib/curius";
+import { CuriusAPIService } from "@/lib/curius";
 
 const program = Effect.gen(function* () {
   const curius = yield* CuriusAPIService;
@@ -45,4 +45,3 @@ const runnable = program.pipe(
 );
 
 Effect.runPromise(runnable).catch(console.error);
-
