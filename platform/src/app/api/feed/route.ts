@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   if (!userHandle) {
     return NextResponse.json(
       { error: "user_handle is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
 
   // Fetch additional users who saved these links
   const saverIds = [...new Set(savedLinks.map((sl) => sl.userId))].filter(
-    (id) => !usersMap.has(id)
+    (id) => !usersMap.has(id),
   );
   if (saverIds.length > 0) {
     const savers = await db
@@ -214,7 +214,9 @@ export async function GET(request: NextRequest) {
         link: item.link,
         description: item.snippet ?? "",
         pubDate: new Date(item.modifiedDate),
-        guid: item.link,
+        guid: {
+          value: `curius-${item.id}`,
+        },
       })),
     });
 
@@ -227,4 +229,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(feed);
 }
-
