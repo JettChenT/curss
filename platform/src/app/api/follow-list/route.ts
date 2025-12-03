@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
       lastName: usersTable.lastName,
       userLink: usersTable.userLink,
       lastOnline: usersTable.lastOnline,
+      numFollowers: usersTable.numFollowers,
     })
     .from(usersTable)
     .where(inArray(usersTable.id, firstDegreeIds));
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
       lastName: string;
       userLink: string;
       lastOnline: string;
+      numFollowers: number;
     };
     order: number;
   }> = firstDegreeUsers.map((u) => ({
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
           lastName: usersTable.lastName,
           userLink: usersTable.userLink,
           lastOnline: usersTable.lastOnline,
+          numFollowers: usersTable.numFollowers,
         })
         .from(usersTable)
         .where(inArray(usersTable.id, secondDegreeIds));

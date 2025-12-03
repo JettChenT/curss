@@ -5,6 +5,7 @@ export type User = {
   lastName: string;
   userLink: string;
   lastOnline: string;
+  numFollowers: number;
 };
 
 export type FollowingUser = {
@@ -13,6 +14,7 @@ export type FollowingUser = {
   lastName: string;
   userLink: string;
   lastOnline: string;
+  numFollowers: number;
 };
 
 export type FollowWithOrder = {

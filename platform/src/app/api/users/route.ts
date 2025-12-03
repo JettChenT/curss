@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { usersTable } from "@/db/schema";
 
@@ -10,8 +11,10 @@ export async function GET() {
       lastName: usersTable.lastName,
       userLink: usersTable.userLink,
       lastOnline: usersTable.lastOnline,
+      numFollowers: usersTable.numFollowers,
     })
-    .from(usersTable);
+    .from(usersTable)
+    .orderBy(desc(usersTable.numFollowers));
 
   return NextResponse.json({
     users: users.map((u) => ({

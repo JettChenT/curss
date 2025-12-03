@@ -19,7 +19,7 @@ export type UseSearchUsersResult = {
 
 export function useSearchUsers(
   query: string,
-  options?: UseSearchUsersOptions
+  options?: UseSearchUsersOptions,
 ): UseSearchUsersResult {
   const { data, isLoading, isError, error } = useAllUsers();
 
@@ -37,7 +37,10 @@ export function useSearchUsers(
   const trimmedQuery = query?.trim() ?? "";
   const results: User[] = useMemo(() => {
     const limit = options?.limit ?? 20;
-    if (!trimmedQuery) return users.slice(0, limit);
+    if (!trimmedQuery) {
+      // When no query, return users sorted by follower count (already sorted from API)
+      return users.slice(0, limit);
+    }
     return fuse.search(trimmedQuery, { limit }).map((m) => m.item);
   }, [fuse, users, trimmedQuery, options?.limit]);
 
@@ -49,4 +52,3 @@ export function useSearchUsers(
     total: users.length,
   };
 }
-

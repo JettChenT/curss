@@ -25,7 +25,7 @@ export default function Home() {
 
   const { results: userResults, isLoading: usersLoading } = useSearchUsers(
     search,
-    { limit: 8 }
+    { limit: 8 },
   );
 
   const suggestionListRef = useRef<HTMLUListElement | null>(null);
@@ -61,7 +61,7 @@ export default function Home() {
           setFeedLimit((l) => Math.min(l + 100, 500));
         }
       },
-      { root, rootMargin: "0px 0px 200px 0px", threshold: 0 }
+      { root, rootMargin: "0px 0px 200px 0px", threshold: 0 },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -207,7 +207,7 @@ export default function Home() {
                   } else if (e.key === "ArrowUp") {
                     e.preventDefault();
                     setActiveIndex((idx) =>
-                      idx <= 0 ? items.length - 1 : idx - 1
+                      idx <= 0 ? items.length - 1 : idx - 1,
                     );
                   } else if (e.key === "Enter") {
                     if (activeIndex >= 0 && activeIndex < items.length) {
@@ -293,6 +293,7 @@ export default function Home() {
                       lastName: u.lastName,
                       userLink: u.userLink,
                       lastOnline: u.lastOnline,
+                      numFollowers: u.numFollowers,
                     });
                     setSearch(`${u.firstName} ${u.lastName}`);
                   }}
