@@ -19,7 +19,9 @@ import { useFeed } from "@/lib/hooks/use-feed";
 import { useFollowList } from "@/lib/hooks/use-follow-list";
 import { FeedItem } from "@/components/feed-item";
 import { FollowList } from "@/components/follow-list";
+import { FollowGraph } from "@/components/follow-graph";
 import { ProfileLinks } from "@/components/profile-links";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAllUsers } from "@/lib/hooks/use-all-users";
 import type { ProfileMetadata } from "@/lib/types";
 
@@ -54,6 +56,9 @@ function HomeContent() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [linkSearch, setLinkSearch] = useState("");
   const [debouncedLinkSearch, setDebouncedLinkSearch] = useState("");
+  const [followViewMode, setFollowViewMode] = useState<"list" | "graph">(
+    "list",
+  );
 
   // Get all users for lookup and display
   const { data: allUsersData, isLoading: allUsersLoading } = useAllUsers();
@@ -276,13 +281,33 @@ function HomeContent() {
           {/* User List */}
           <div className="flex-1 min-h-0 flex flex-col">
             {userHandle ? (
-              /* Follow List for selected user */
+              /* Follow List/Graph for selected user */
               degree > 0 ? (
-                <>
-                  <div className="mb-2 text-sm text-muted-foreground shrink-0">
-                    {`Follow list (${degree}°${!followsLoading ? ` • ${follows?.length ?? 0}` : ""})`}
+                <Tabs
+                  value={followViewMode}
+                  onValueChange={(v) =>
+                    setFollowViewMode(v as "list" | "graph")
+                  }
+                  className="flex-1 min-h-0 flex flex-col"
+                >
+                  <div className="shrink-0 flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">
+                      {`Follow network (${degree}°${!followsLoading ? ` • ${follows?.length ?? 0}` : ""})`}
+                    </span>
+                    <TabsList className="h-8">
+                      <TabsTrigger value="list" className="text-xs px-2 py-1">
+                        List
+                      </TabsTrigger>
+                      <TabsTrigger value="graph" className="text-xs px-2 py-1">
+                        Graph
+                      </TabsTrigger>
+                    </TabsList>
                   </div>
-                  <div className="flex-1 min-h-0 overflow-auto">
+
+                  <TabsContent
+                    value="list"
+                    className="flex-1 min-h-0 overflow-auto"
+                  >
                     {followsLoading ? (
                       <div className="text-sm text-muted-foreground">
                         Loading follows…
@@ -293,8 +318,25 @@ function HomeContent() {
                         onSelect={(u) => selectUser(u.userLink)}
                       />
                     )}
-                  </div>
-                </>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="graph"
+                    className="flex-1 min-h-0 relative"
+                  >
+                    {followsLoading ? (
+                      <div className="text-sm text-muted-foreground">
+                        Loading follows…
+                      </div>
+                    ) : (
+                      <FollowGraph
+                        rootUser={selectedUser}
+                        items={follows ?? []}
+                        onSelect={(u) => selectUser(u.userLink)}
+                      />
+                    )}
+                  </TabsContent>
+                </Tabs>
               ) : null
             ) : (
               /* All Users List (Global Feed mode) */

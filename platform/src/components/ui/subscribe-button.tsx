@@ -34,4 +34,3 @@ export function SubscribeButton({ rssUrl }: SubscribeButtonProps) {
     </Button>
   );
 }
-

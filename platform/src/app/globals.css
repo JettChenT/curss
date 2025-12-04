@@ -154,7 +154,9 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family:
+      "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
     overflow: hidden;
   }
 }
