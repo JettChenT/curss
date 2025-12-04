@@ -322,7 +322,7 @@ function HomeContent() {
 
                   <TabsContent
                     value="graph"
-                    className="flex-1 min-h-0 relative"
+                    className="flex-1 min-h-[300px] relative"
                   >
                     {followsLoading ? (
                       <div className="text-sm text-muted-foreground">
@@ -330,9 +330,9 @@ function HomeContent() {
                       </div>
                     ) : (
                       <FollowGraph
-                        rootUser={selectedUser}
-                        items={follows ?? []}
-                        onSelect={(u) => selectUser(u.userLink)}
+                        userHandle={userHandle}
+                        order={degree}
+                        onSelect={(userLink) => selectUser(userLink)}
                       />
                     )}
                   </TabsContent>

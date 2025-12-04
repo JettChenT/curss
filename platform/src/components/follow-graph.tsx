@@ -1,21 +1,21 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import type { FollowWithOrder, FollowingUser, User } from "@/lib/types";
+import {
+  useFollowGraph,
+  type GraphNode as APIGraphNode,
+} from "@/lib/hooks/use-follow-graph";
 
-// Dynamic import for react-force-graph since it requires window
-const ForceGraph2D = dynamic(
-  () => import("react-force-graph").then((mod) => mod.ForceGraph2D),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Loading graph...
-      </div>
-    ),
-  },
-);
+// Dynamic import for react-force-graph-2d since it requires window
+const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+      Loading graph...
+    </div>
+  ),
+});
 
 type GraphNode = {
   id: string;
@@ -29,7 +29,6 @@ type GraphNode = {
 type GraphLink = {
   source: string;
   target: string;
-  order: number;
 };
 
 type GraphData = {
@@ -38,129 +37,113 @@ type GraphData = {
 };
 
 type FollowGraphProps = {
-  rootUser: User | null;
-  items: FollowWithOrder[];
-  onSelect?: (user: FollowingUser) => void;
+  userHandle: string | null;
+  order: number;
+  onSelect?: (userLink: string) => void;
 };
 
-function buildGraphData(
-  rootUser: User | null,
-  items: FollowWithOrder[],
+function transformGraphData(
+  apiNodes: APIGraphNode[],
+  apiEdges: { source: number; target: number }[],
 ): GraphData {
-  const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const nodeMap = new Map<string, GraphNode>();
+  const nodes: GraphNode[] = apiNodes.map((n) => ({
+    id: String(n.id),
+    name: `${n.firstName} ${n.lastName}`,
+    userLink: n.userLink,
+    order: n.order,
+    numFollowers: n.numFollowers,
+    isRoot: n.order === 0,
+  }));
 
-  // Add root user as central node
-  if (rootUser) {
-    const rootNode: GraphNode = {
-      id: String(rootUser.id),
-      name: `${rootUser.firstName} ${rootUser.lastName}`,
-      userLink: rootUser.userLink,
-      order: 0,
-      numFollowers: rootUser.numFollowers,
-      isRoot: true,
-    };
-    nodes.push(rootNode);
-    nodeMap.set(rootNode.id, rootNode);
-  }
-
-  // Group items by order to build hierarchical connections
-  const byOrder = new Map<number, FollowWithOrder[]>();
-  for (const item of items) {
-    const orderItems = byOrder.get(item.order) ?? [];
-    orderItems.push(item);
-    byOrder.set(item.order, orderItems);
-  }
-
-  // Add all followed users as nodes
-  for (const item of items) {
-    const u = item.followingUser;
-    const nodeId = String(u.id);
-
-    if (!nodeMap.has(nodeId)) {
-      const node: GraphNode = {
-        id: nodeId,
-        name: `${u.firstName} ${u.lastName}`,
-        userLink: u.userLink,
-        order: item.order,
-        numFollowers: u.numFollowers,
-        isRoot: false,
-      };
-      nodes.push(node);
-      nodeMap.set(nodeId, node);
-    }
-  }
-
-  // Create links from root to order-1 users
-  if (rootUser) {
-    const order1 = byOrder.get(1) ?? [];
-    for (const item of order1) {
-      links.push({
-        source: String(rootUser.id),
-        target: String(item.followingUser.id),
-        order: 1,
-      });
-    }
-  }
-
-  // For order-2 users, we connect to random order-1 users (since we don't have exact follow info)
-  // In a real scenario, you'd have the actual follow relationship data
-  const order1Users = byOrder.get(1) ?? [];
-  const order2Users = byOrder.get(2) ?? [];
-
-  if (order1Users.length > 0) {
-    for (const item of order2Users) {
-      // Connect to a "random" order-1 user based on id hash for consistency
-      const targetIdx = Math.abs(item.followingUser.id) % order1Users.length;
-      const targetUser = order1Users[targetIdx];
-      if (targetUser) {
-        links.push({
-          source: String(targetUser.followingUser.id),
-          target: String(item.followingUser.id),
-          order: 2,
-        });
-      }
-    }
-  }
+  const links: GraphLink[] = apiEdges.map((e) => ({
+    source: String(e.source),
+    target: String(e.target),
+  }));
 
   return { nodes, links };
 }
 
-export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 400, height: 300 });
-  const graphData = buildGraphData(rootUser, items);
+// Hook to get container dimensions - uses ref measurement with fallback to container size
+function useContainerDimensions(ref: React.RefObject<HTMLDivElement | null>) {
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
-  // Update dimensions on mount and resize
   useEffect(() => {
+    const container = ref.current;
+    if (!container) return;
+
+    let mounted = true;
+
     const updateDimensions = () => {
-      if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        setDimensions({
-          width: clientWidth || 400,
-          height: clientHeight || 300,
-        });
+      if (!mounted || !container) return;
+
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setDimensions({ width: rect.width, height: rect.height });
       }
     };
 
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
+    // Measure after layout with requestAnimationFrame
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(updateDimensions);
+    });
+
+    // Also use ResizeObserver
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry && mounted) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+    };
+  }, [ref]);
+
+  // Return measured dimensions or a reasonable default based on typical panel size
+  return dimensions ?? { width: 350, height: 400 };
+}
+
+export function FollowGraph({ userHandle, order, onSelect }: FollowGraphProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dimensions = useContainerDimensions(containerRef);
+  const hoveredNodeRef = useRef<string | null>(null);
+
+  const { data: graphResponse, isLoading } = useFollowGraph({
+    user_handle: userHandle ?? undefined,
+    order,
+  });
+
+  // Memoize graph data to prevent recreation on every render
+  const graphData = useMemo(() => {
+    if (!graphResponse) return { nodes: [], links: [] };
+    return transformGraphData(graphResponse.nodes, graphResponse.edges);
+  }, [graphResponse]);
+
+  // Find root user name for legend
+  const rootUserName = graphData.nodes.find((n) => n.isRoot)?.name ?? "You";
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
       if (node.isRoot) return;
-
-      // Find the matching item to get FollowingUser type
-      const item = items.find((f) => String(f.followingUser.id) === node.id);
-      if (item && onSelect) {
-        onSelect(item.followingUser);
-      }
+      onSelect?.(node.userLink);
     },
-    [items, onSelect],
+    [onSelect],
   );
+
+  // Handle hover without causing re-render (uses ref instead of state)
+  const handleNodeHover = useCallback((node: GraphNode | null) => {
+    hoveredNodeRef.current = node ? node.id : null;
+  }, []);
 
   const getNodeColor = useCallback((node: GraphNode) => {
     if (node.isRoot) return "#f97316"; // orange for root
@@ -176,7 +159,15 @@ export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
     return Math.min(base + scale, 7);
   }, []);
 
-  if (!items?.length) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        Loading graph...
+      </div>
+    );
+  }
+
+  if (!graphData.nodes.length || graphData.nodes.length <= 1) {
     return (
       <div className="text-sm text-muted-foreground">
         No follows for this degree.
@@ -184,33 +175,28 @@ export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
     );
   }
 
+  // Create a key that changes when dimensions change significantly from default
+  // This forces ForceGraph to remount with correct dimensions
+  const graphKey = `${Math.round(dimensions.width / 10)}-${Math.round(dimensions.height / 10)}`;
+
   return (
-    <div ref={containerRef} className="w-full h-full min-h-[300px]">
+    <div ref={containerRef} className="w-full h-[400px]">
       <ForceGraph2D
+        key={graphKey}
         width={dimensions.width}
         height={dimensions.height}
         graphData={graphData}
-        nodeLabel={(node) => {
-          const n = node as GraphNode;
-          return `${n.name}${n.isRoot ? " (you)" : ""}\n${n.numFollowers} followers`;
-        }}
+        nodeLabel={(node) => (node as GraphNode).name}
         nodeColor={(node) => getNodeColor(node as GraphNode)}
         nodeVal={(node) => getNodeSize(node as GraphNode)}
-        linkColor={(link) => {
-          const l = link as GraphLink;
-          return l.order === 1
-            ? "rgba(59, 130, 246, 0.4)"
-            : "rgba(139, 92, 246, 0.3)";
-        }}
-        linkWidth={(link) => {
-          const l = link as GraphLink;
-          return l.order === 1 ? 1.5 : 1;
-        }}
+        linkColor={() => "rgba(100, 100, 100, 0.3)"}
+        linkWidth={1}
+        linkDirectionalArrowLength={3}
+        linkDirectionalArrowRelPos={1}
         onNodeClick={(node) => handleNodeClick(node as GraphNode)}
+        onNodeHover={(node) => handleNodeHover(node as GraphNode | null)}
         nodeCanvasObject={(node, ctx, globalScale) => {
           const n = node as GraphNode;
-          const label = n.name;
-          const fontSize = 12 / globalScale;
           const nodeSize = getNodeSize(n);
           const x = (node as { x?: number }).x ?? 0;
           const y = (node as { y?: number }).y ?? 0;
@@ -220,13 +206,6 @@ export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
           ctx.arc(x, y, nodeSize, 0, 2 * Math.PI);
           ctx.fillStyle = getNodeColor(n);
           ctx.fill();
-
-          // Draw label
-          ctx.font = `${fontSize}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillStyle = "#e5e5e5";
-          ctx.fillText(label, x, y + nodeSize + fontSize);
         }}
         nodePointerAreaPaint={(node, color, ctx) => {
           const n = node as GraphNode;
@@ -239,7 +218,7 @@ export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
           ctx.fill();
         }}
         backgroundColor="transparent"
-        cooldownTicks={100}
+        cooldownTicks={500}
         d3AlphaDecay={0.02}
         d3VelocityDecay={0.3}
       />
@@ -247,7 +226,7 @@ export function FollowGraph({ rootUser, items, onSelect }: FollowGraphProps) {
       <div className="absolute bottom-2 left-2 text-xs text-muted-foreground space-y-1 bg-background/80 rounded p-2">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-orange-500" />
-          <span>You</span>
+          <span>{rootUserName}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-blue-500" />
