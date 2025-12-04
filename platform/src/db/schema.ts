@@ -7,7 +7,7 @@ import {
   primaryKey,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const linksTable = pgTable(
   "links",
@@ -25,7 +25,17 @@ export const linksTable = pgTable(
     lastCrawled: timestamp().notNull(),
     metadata: jsonb(),
   },
-  (table) => [index("links_created_by_idx").on(table.createdBy)],
+  (table) => [
+    index("links_created_by_idx").on(table.createdBy),
+    index("links_search_idx").using(
+      "gin",
+      sql`(
+        setweight(to_tsvector('english', ${table.title}), 'A') ||
+        setweight(to_tsvector('english', ${table.snippet}), 'B') ||
+        setweight(to_tsvector('english', coalesce(${table.fulltext}, '')), 'C')
+      )`,
+    ),
+  ],
 );
 
 export const usersTable = pgTable("users", {

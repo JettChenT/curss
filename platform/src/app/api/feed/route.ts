@@ -6,7 +6,7 @@ import {
   linksTable,
   savedLinksTable,
 } from "@/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { generateRssFeed } from "feedsmith";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const order = parseInt(searchParams.get("order") ?? "1", 10);
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10), 500);
   const format = searchParams.get("format") ?? "json";
+  const search = searchParams.get("search")?.trim() ?? "";
 
   let firstDegreeIds: number[] = [];
   let targetUserIds: number[] = [];
@@ -67,6 +68,27 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Build full-text search condition if search is provided
+  const searchCondition = search
+    ? sql`(
+        setweight(to_tsvector('english', ${linksTable.title}), 'A') ||
+        setweight(to_tsvector('english', ${linksTable.snippet}), 'B') ||
+        setweight(to_tsvector('english', coalesce(${linksTable.fulltext}, '')), 'C')
+      ) @@ websearch_to_tsquery('english', ${search})`
+    : undefined;
+
+  // Build user filter condition
+  const userCondition =
+    targetUserIds.length > 0
+      ? inArray(linksTable.createdBy, targetUserIds)
+      : undefined;
+
+  // Combine conditions
+  const whereCondition =
+    searchCondition && userCondition
+      ? and(userCondition, searchCondition)
+      : searchCondition ?? userCondition;
+
   // Get links - either filtered by target users or global (all links)
   const links = await db
     .select({
@@ -82,11 +104,7 @@ export async function GET(request: NextRequest) {
     })
     .from(linksTable)
     .$dynamic()
-    .where(
-      targetUserIds.length > 0
-        ? inArray(linksTable.createdBy, targetUserIds)
-        : undefined,
-    )
+    .where(whereCondition)
     .orderBy(desc(linksTable.modifiedDate))
     .limit(limit);
 

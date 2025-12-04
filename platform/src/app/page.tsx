@@ -22,6 +22,8 @@ export default function Home() {
   const [feedLimit, setFeedLimit] = useState<number>(100);
   const feedContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
+  const [debouncedLinkSearch, setDebouncedLinkSearch] = useState("");
 
   const { results: userResults, isLoading: usersLoading } = useSearchUsers(
     search,
@@ -32,6 +34,14 @@ export default function Home() {
 
   const userHandle = selectedUser?.userLink;
 
+  // Debounce link search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLinkSearch(linkSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [linkSearch]);
+
   const {
     data: feed,
     isLoading: feedLoading,
@@ -40,12 +50,15 @@ export default function Home() {
     user_handle: userHandle,
     order: degree,
     limit: feedLimit,
+    search: debouncedLinkSearch || undefined,
   });
 
-  // Reset feed limit when user or degree changes
+  // Reset feed limit and link search when user or degree changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on userHandle/degree change
   useEffect(() => {
     setFeedLimit(100);
+    setLinkSearch("");
+    setDebouncedLinkSearch("");
   }, [userHandle, degree]);
 
   const hasMore = Boolean(feed && feed.length >= feedLimit && feedLimit < 500);
@@ -132,7 +145,7 @@ export default function Home() {
       <div className="grid grid-cols-12 gap-4 h-full min-h-0">
         {/* Left: Feed (larger) */}
         <div className="col-span-12 md:col-span-8 h-full min-h-0 pr-1 flex flex-col">
-          <div className="shrink-0">
+          <div className="shrink-0 space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 {selectedUser ? (
@@ -157,6 +170,26 @@ export default function Home() {
                   </Button>
                 )}
               </div>
+            </div>
+            <div className="relative">
+              <Input
+                placeholder="Search links..."
+                value={linkSearch}
+                onChange={(e) => setLinkSearch(e.target.value)}
+                className="pr-8"
+              />
+              {linkSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinkSearch("");
+                    setDebouncedLinkSearch("");
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
 
