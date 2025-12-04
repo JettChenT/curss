@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { SubscribeButton } from "@/components/ui/subscribe-button";
 import { useSearchUsers } from "@/lib/hooks/use-search-users";
 import { useFeed } from "@/lib/hooks/use-feed";
 import { useFollowList } from "@/lib/hooks/use-follow-list";
@@ -36,8 +37,6 @@ function HomeContent() {
 
   // Local UI state
   const [userSearch, setUserSearch] = useState("");
-  const [copied, setCopied] = useState(false);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [feedLimit, setFeedLimit] = useState<number>(100);
   const feedContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -113,14 +112,6 @@ function HomeContent() {
     order: degree,
   });
 
-  useEffect(() => {
-    return () => {
-      if (copiedTimerRef.current) {
-        clearTimeout(copiedTimerRef.current);
-      }
-    };
-  }, []);
-
   // URL navigation helpers
   function selectUser(userLink: string) {
     router.push(`/?user=${encodeURIComponent(userLink)}&degree=0`);
@@ -137,14 +128,9 @@ function HomeContent() {
     setUserSearch("");
   }
 
-  const handleCopyRss = async () => {
-    if (!userHandle) return;
-    const url = `${window.location.origin}/api/feed?user_handle=${encodeURIComponent(userHandle)}&order=${degree}&limit=${feedLimit}&format=rss`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
-  };
+  const rssUrl = userHandle
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/feed?user_handle=${encodeURIComponent(userHandle)}&order=${degree}&limit=${feedLimit}&format=rss`
+    : `${typeof window !== "undefined" ? window.location.origin : ""}/api/feed?limit=${feedLimit}&format=rss`;
 
   // Show loading state while fetching user data for URL param
   const isLoadingSelectedUser = userHandle && allUsersLoading;
@@ -181,7 +167,7 @@ function HomeContent() {
           {/* Feed */}
           <div
             ref={feedContainerRef}
-            className="flex-1 min-h-0 overflow-auto space-y-3 pr-2"
+            className="flex-1 min-h-0 overflow-auto space-y-3"
           >
             {feedLoading ? (
               <div className="text-sm text-muted-foreground">Loading feed…</div>
@@ -257,15 +243,8 @@ function HomeContent() {
                   </p>
                 </div>
 
-                {/* RSS Copy Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyRss}
-                  className="w-full"
-                >
-                  {copied ? "Copied!" : "Copy RSS Feed"}
-                </Button>
+                {/* RSS Subscribe Button */}
+                <SubscribeButton rssUrl={rssUrl} />
               </div>
             ) : (
               /* Global Feed Mode */
@@ -276,6 +255,7 @@ function HomeContent() {
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                 />
+                <SubscribeButton rssUrl={rssUrl} />
               </div>
             )}
           </div>
@@ -309,48 +289,50 @@ function HomeContent() {
               )
             ) : (
               /* All Users List (Global Feed mode) */
-              <div className="space-y-1">
-                {usersLoading || allUsersLoading ? (
-                  <div className="text-sm text-muted-foreground">
-                    Loading users…
-                  </div>
-                ) : searchedUsers.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">
-                    No users found.
-                  </div>
-                ) : (
-                  searchedUsers.map((u) => {
-                    const handleNoAt = u.userLink.replace(/^@/, "");
-                    const href = `https://curius.app/${handleNoAt}`;
+              <div className="flex-1 min-h-0 overflow-auto">
+                <div className="space-y-1">
+                  {usersLoading || allUsersLoading ? (
+                    <div className="text-sm text-muted-foreground">
+                      Loading users…
+                    </div>
+                  ) : searchedUsers.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No users found.
+                    </div>
+                  ) : (
+                    searchedUsers.map((u) => {
+                      const handleNoAt = u.userLink.replace(/^@/, "");
+                      const href = `https://curius.app/${handleNoAt}`;
 
-                    return (
-                      <button
-                        type="button"
-                        key={String(u.id)}
-                        className="w-full flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 hover:bg-accent transition-colors text-left"
-                        onClick={() => selectUser(u.userLink)}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">
-                            {u.firstName} {u.lastName}
+                      return (
+                        <button
+                          type="button"
+                          key={String(u.id)}
+                          className="w-full flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 hover:bg-accent transition-colors text-left"
+                          onClick={() => selectUser(u.userLink)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate">
+                              {u.firstName} {u.lastName}
+                            </div>
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              curius.app/{handleNoAt}
+                            </a>
                           </div>
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            curius.app/{handleNoAt}
-                          </a>
-                        </div>
-                        <span className="ml-2 shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {u.numFollowers} followers
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
+                          <span className="ml-2 shrink-0 text-xs text-muted-foreground tabular-nums">
+                            {u.numFollowers} followers
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>

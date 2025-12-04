@@ -54,12 +54,24 @@ export function FeedItem({ item }: FeedItemProps) {
               {savedBy.length}
             </span>
             <span>
-              {savedBy.slice(0, 1).map((s) => s.followingUser.firstName)[0]}
-              {savedBy.length > 1
-                ? ", " +
-                  savedBy.slice(1, 2).map((s) => s.followingUser.firstName)[0]
-                : ""}
-              {savedBy.length > 2 ? `, and ${savedBy.length - 2} more` : ""}
+              <a
+                href={`/?user=${encodeURIComponent(savedBy[0].followingUser.userLink)}&degree=0`}
+                className="hover:underline"
+              >
+                {savedBy[0].followingUser.firstName}
+              </a>
+              {savedBy.length > 1 && (
+                <>
+                  {", "}
+                  <a
+                    href={`/?user=${encodeURIComponent(savedBy[1].followingUser.userLink)}&degree=0`}
+                    className="hover:underline"
+                  >
+                    {savedBy[1].followingUser.firstName}
+                  </a>
+                </>
+              )}
+              {savedBy.length > 2 && `, and ${savedBy.length - 2} more`}
             </span>
           </div>
         ) : (
