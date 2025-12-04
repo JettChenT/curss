@@ -126,7 +126,7 @@ function HomeContent() {
 
   // URL navigation helpers
   function selectUser(userLink: string) {
-    router.push(`/?user=${encodeURIComponent(userLink)}&degree=0`);
+    router.push(`/?user=${encodeURIComponent(userLink)}&degree=${degree}`);
     setUserSearch("");
   }
 
