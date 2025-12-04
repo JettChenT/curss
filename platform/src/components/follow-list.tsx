@@ -17,7 +17,7 @@ export function FollowList({ items, onSelect }: FollowListProps) {
   }
 
   return (
-    <ul className="space-y-2 max-h-[calc(100vh-150px)] overflow-auto pr-1">
+    <ul className="space-y-2 pr-1">
       {items.map((f) => {
         const u = f.followingUser;
         const raw = u.userLink ?? "";

@@ -15,9 +15,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Find user by handle
+  // Find user by handle (with full details)
   const [user] = await db
-    .select({ id: usersTable.id })
+    .select({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      userLink: usersTable.userLink,
+      lastOnline: usersTable.lastOnline,
+      numFollowers: usersTable.numFollowers,
+    })
     .from(usersTable)
     .where(eq(usersTable.userLink, userHandle))
     .limit(1);
@@ -25,6 +32,27 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+
+  const result: Array<{
+    followingUser: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      userLink: string;
+      lastOnline: string;
+      numFollowers: number;
+    };
+    order: number;
+  }> = [];
+
+  // Include the user themselves at order 0
+  result.push({
+    followingUser: {
+      ...user,
+      lastOnline: user.lastOnline.toISOString(),
+    },
+    order: 0,
+  });
 
   // Get 1st degree follows
   const firstDegreeFollows = await db
@@ -35,7 +63,7 @@ export async function GET(request: NextRequest) {
   const firstDegreeIds = firstDegreeFollows.map((f) => f.followingId);
 
   if (firstDegreeIds.length === 0) {
-    return NextResponse.json([]);
+    return NextResponse.json(result);
   }
 
   // Get user details for 1st degree
@@ -51,23 +79,15 @@ export async function GET(request: NextRequest) {
     .from(usersTable)
     .where(inArray(usersTable.id, firstDegreeIds));
 
-  const result: Array<{
-    followingUser: {
-      id: number;
-      firstName: string;
-      lastName: string;
-      userLink: string;
-      lastOnline: string;
-      numFollowers: number;
-    };
-    order: number;
-  }> = firstDegreeUsers.map((u) => ({
-    followingUser: {
-      ...u,
-      lastOnline: u.lastOnline.toISOString(),
-    },
-    order: 1,
-  }));
+  for (const u of firstDegreeUsers) {
+    result.push({
+      followingUser: {
+        ...u,
+        lastOnline: u.lastOnline.toISOString(),
+      },
+      order: 1,
+    });
+  }
 
   // If order >= 2, get 2nd degree follows
   if (order >= 2) {
