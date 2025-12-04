@@ -1,4 +1,14 @@
 // User types
+export type ProfileMetadata = {
+  major?: string | null;
+  interests?: string | null;
+  expertise?: string | null;
+  school?: string | null;
+  github?: string | null;
+  twitter?: string | null;
+  website?: string | null;
+} | null;
+
 export type User = {
   id: number;
   firstName: string;
@@ -6,6 +16,7 @@ export type User = {
   userLink: string;
   lastOnline: string;
   numFollowers: number;
+  profileMetadata?: ProfileMetadata;
 };
 
 export type FollowingUser = {

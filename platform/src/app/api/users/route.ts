@@ -12,6 +12,7 @@ export async function GET() {
       userLink: usersTable.userLink,
       lastOnline: usersTable.lastOnline,
       numFollowers: usersTable.numFollowers,
+      profileMetadata: usersTable.profileMetadata,
     })
     .from(usersTable)
     .orderBy(desc(usersTable.numFollowers));
@@ -23,4 +24,3 @@ export async function GET() {
     })),
   });
 }
-
