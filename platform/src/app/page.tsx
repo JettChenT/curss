@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useDeferredValue,
+  Suspense,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Image from "next/image";
-import { Icon } from "@iconify/react";
+import { Command } from "cmdk";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -13,6 +19,7 @@ import { useFeed } from "@/lib/hooks/use-feed";
 import { useFollowList } from "@/lib/hooks/use-follow-list";
 import { FeedItem } from "@/components/feed-item";
 import { FollowList } from "@/components/follow-list";
+import { ProfileLinks } from "@/components/profile-links";
 import { useAllUsers } from "@/lib/hooks/use-all-users";
 import type { ProfileMetadata } from "@/lib/types";
 
@@ -40,6 +47,8 @@ function HomeContent() {
 
   // Local UI state
   const [userSearch, setUserSearch] = useState("");
+  const deferredUserSearch = useDeferredValue(userSearch);
+  const isUserSearchPending = userSearch !== deferredUserSearch;
   const [feedLimit, setFeedLimit] = useState<number>(100);
   const feedContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -50,9 +59,9 @@ function HomeContent() {
   const { data: allUsersData, isLoading: allUsersLoading } = useAllUsers();
   const allUsersList = allUsersData?.users ?? [];
 
-  // Get users for search in right panel
+  // Get users for search in right panel (uses deferred value for responsiveness)
   const { results: searchedUsers, isLoading: usersLoading } = useSearchUsers(
-    userSearch,
+    deferredUserSearch,
     { limit: 100 },
   );
 
@@ -259,11 +268,6 @@ function HomeContent() {
               /* Global Feed Mode */
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold">Global Curius Feed</h2>
-                <Input
-                  placeholder="Search users..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                />
                 <SubscribeButton rssUrl={rssUrl} />
               </div>
             )}
@@ -291,165 +295,75 @@ function HomeContent() {
                     )}
                   </div>
                 </>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Set degree &gt; 0 to see followed users
-                </div>
-              )
+              ) : null
             ) : (
               /* All Users List (Global Feed mode) */
-              <div className="flex-1 min-h-0 overflow-auto">
-                <div className="space-y-1">
+              <Command
+                className="flex-1 min-h-0 flex flex-col"
+                shouldFilter={false}
+              >
+                <Command.Input
+                  placeholder="Search users..."
+                  value={userSearch}
+                  onValueChange={setUserSearch}
+                  className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring mb-2"
+                />
+                <Command.List
+                  className={`flex-1 min-h-0 overflow-auto transition-opacity ${
+                    isUserSearchPending ? "opacity-60" : ""
+                  }`}
+                >
                   {usersLoading || allUsersLoading ? (
-                    <div className="text-sm text-muted-foreground">
-                      Loading users…
-                    </div>
+                    <Command.Loading>
+                      <div className="text-sm text-muted-foreground px-2 py-1">
+                        Loading users…
+                      </div>
+                    </Command.Loading>
                   ) : searchedUsers.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
+                    <Command.Empty className="text-sm text-muted-foreground px-2 py-1">
                       No users found.
-                    </div>
+                    </Command.Empty>
                   ) : (
-                    searchedUsers.map((u) => {
-                      const handleNoAt = u.userLink.replace(/^@/, "");
-                      const href = `https://curius.app/${handleNoAt}`;
+                    <Command.Group>
+                      {searchedUsers.map((u) => {
+                        const handleNoAt = u.userLink.replace(/^@/, "");
+                        const href = `https://curius.app/${handleNoAt}`;
 
-                      return (
-                        <button
-                          type="button"
-                          key={String(u.id)}
-                          className="w-full flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 hover:bg-accent transition-colors text-left"
-                          onClick={() => selectUser(u.userLink)}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">
-                              {u.firstName} {u.lastName}
+                        return (
+                          <Command.Item
+                            key={String(u.id)}
+                            value={u.userLink}
+                            onSelect={() => selectUser(u.userLink)}
+                            className="w-full flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 text-left data-[selected=true]:bg-accent aria-selected:bg-accent"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium truncate">
+                                {u.firstName} {u.lastName}
+                              </div>
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                curius.app/{handleNoAt}
+                              </a>
                             </div>
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              curius.app/{handleNoAt}
-                            </a>
-                          </div>
-                          <span className="ml-2 shrink-0 text-xs text-muted-foreground tabular-nums">
-                            {u.numFollowers} followers
-                          </span>
-                        </button>
-                      );
-                    })
+                            <span className="ml-2 shrink-0 text-xs text-muted-foreground tabular-nums">
+                              {u.numFollowers} followers
+                            </span>
+                          </Command.Item>
+                        );
+                      })}
+                    </Command.Group>
                   )}
-                </div>
-              </div>
+                </Command.List>
+              </Command>
             )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProfileLinks({
-  userLink,
-  metadata,
-}: {
-  userLink?: string;
-  metadata: ProfileMetadata;
-}) {
-  const { website, twitter, github } = metadata ?? {};
-  const hasLinks = userLink || website || twitter || github;
-
-  if (!hasLinks) return null;
-
-  // Format curius link
-  const curiusHandle = userLink?.replace(/^@/, "");
-  const curiusUrl = curiusHandle ? `https://curius.app/${curiusHandle}` : null;
-
-  // Helper to format website display (remove protocol)
-  const formatWebsite = (url: string) => {
-    return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  };
-
-  // Helper to ensure URL has protocol
-  const ensureProtocol = (url: string) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
-    return `https://${url}`;
-  };
-
-  // Helper to format twitter handle for display
-  const formatTwitter = (handle: string) => {
-    if (handle.startsWith("@")) return handle;
-    if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
-      const parts = handle.split("/");
-      return `@${parts[parts.length - 1]}`;
-    }
-    return `@${handle}`;
-  };
-
-  // Helper to get twitter URL
-  const getTwitterUrl = (handle: string) => {
-    if (handle.startsWith("http")) return handle;
-    const cleanHandle = handle.replace(/^@/, "");
-    return `https://twitter.com/${cleanHandle}`;
-  };
-
-  return (
-    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-      {curiusUrl && (
-        <a
-          href={curiusUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-        >
-          <Image
-            src="https://icons.duckduckgo.com/ip3/curius.app.ico"
-            alt="Curius"
-            width={16}
-            height={16}
-            className="w-4 h-4 shrink-0"
-            unoptimized
-          />
-          <span>{curiusHandle}</span>
-        </a>
-      )}
-      {website && (
-        <a
-          href={ensureProtocol(website)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-        >
-          <Icon icon="ph:link-bold" className="w-4 h-4 shrink-0" />
-          <span>{formatWebsite(website)}</span>
-        </a>
-      )}
-      {twitter && (
-        <a
-          href={getTwitterUrl(twitter)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-        >
-          <Icon icon="ri:twitter-x-fill" className="w-4 h-4 shrink-0" />
-          <span>{formatTwitter(twitter)}</span>
-        </a>
-      )}
-      {github && (
-        <a
-          href={github}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-        >
-          <Icon icon="mdi:github" className="w-4 h-4 shrink-0" />
-          <span>{github.replace(/^https?:\/\/github\.com\//, "")}</span>
-        </a>
-      )}
     </div>
   );
 }

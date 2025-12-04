@@ -2,6 +2,16 @@
 
 import type { Content } from "@/lib/types";
 import humanizeDuration from "humanize-duration";
+import Image from "next/image";
+
+function getFaviconUrl(feedUrl: string): string | undefined {
+  try {
+    const { hostname } = new URL(feedUrl);
+    return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+  } catch {
+    return undefined;
+  }
+}
 
 type FeedItemProps = {
   item: Content;
@@ -94,7 +104,20 @@ export function FeedItem({ item }: FeedItemProps) {
       </a>
 
       {/* Domain */}
-      <div className="mt-1 text-[13px] text-muted-foreground">
+      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        {(() => {
+          const faviconUrl = getFaviconUrl(item.link);
+          return faviconUrl ? (
+            <Image
+              src={faviconUrl}
+              alt=""
+              width={16}
+              height={16}
+              className="size-4 rounded-sm"
+              unoptimized
+            />
+          ) : null;
+        })()}
         {(() => {
           try {
             const url = new URL(item.link);
