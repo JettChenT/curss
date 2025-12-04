@@ -35,7 +35,6 @@ export function useFeed(params: UseFeedParams) {
         limit,
       }),
     placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
+    refetchInterval: 10000,
   });
 }
-

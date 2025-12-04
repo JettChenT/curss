@@ -1,10 +1,46 @@
 "use client";
 
 import type { Content } from "@/lib/types";
+import humanizeDuration from "humanize-duration";
 
 type FeedItemProps = {
   item: Content;
 };
+
+const shortEnglish = humanizeDuration.humanizer({
+  language: "shortEn",
+  languages: {
+    shortEn: {
+      y: () => "y",
+      mo: () => "mo",
+      w: () => "w",
+      d: () => "d",
+      h: () => "h",
+      m: () => "m",
+      s: () => "s",
+      ms: () => "ms",
+    },
+  },
+  round: true,
+  largest: 1,
+  spacer: "",
+});
+
+function formatDate(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  if (diffMs < 24 * 60 * 60 * 1000 && diffMs >= 0) {
+    if (diffMs < 60 * 1000) return "now";
+    return shortEnglish(diffMs);
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export function FeedItem({ item }: FeedItemProps) {
   const savedBy = item.savedBy ?? [];
@@ -31,14 +67,7 @@ export function FeedItem({ item }: FeedItemProps) {
         )}
         <span className="mx-1">/</span>
         <span>
-          {new Date(item.modifiedDate || item.createdDate).toLocaleDateString(
-            undefined,
-            {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            }
-          )}
+          {formatDate(new Date(item.modifiedDate || item.createdDate))}
         </span>
       </div>
 
