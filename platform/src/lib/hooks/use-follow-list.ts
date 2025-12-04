@@ -29,4 +29,3 @@ export function useFollowList(params: UseFollowListParams) {
     enabled: Boolean(user_handle),
   });
 }
-

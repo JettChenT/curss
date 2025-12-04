@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
   const whereCondition =
     searchCondition && userCondition
       ? and(userCondition, searchCondition)
-      : searchCondition ?? userCondition;
+      : (searchCondition ?? userCondition);
 
   // Get links - either filtered by target users or global (all links)
   const links = await db
