@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateRssFeed } from "feedsmith";
+import { generateRssFeed, generateAtomFeed, generateJsonFeed } from "feedsmith";
 import { getUserByHandle, getUsersMap } from "@/lib/queries/users";
 import {
   getLinksByUserIds,
@@ -87,27 +87,82 @@ export async function GET(request: NextRequest) {
       usersMap,
       savedByUserIds: savedByMap.get(link.id) ?? [],
       getOrder,
-    })
+    }),
   );
 
-  if (format === "rss") {
-    const rss = generateRssFeed({
-      title: `Curius - ${userHandle} - ${order} order feed`,
-      link: `https://curius.app/${userHandle}`,
-      description: `The curius network feed for ${userHandle} and their connections within the network (distance <= ${order})`,
-      items: feed.map((item) => ({
-        title: item.title ?? "Untitled",
-        link: item.link,
-        description: item.snippet ?? "",
-        pubDate: new Date(item.modifiedDate),
-        guid: { value: `curius-${item.id}` },
-      })),
-    });
+  const feedTitle = userHandle
+    ? `Curius - ${userHandle} - ${order} order feed`
+    : "Curius - Global Feed";
+  const feedLink = userHandle
+    ? `https://curius.app/${userHandle}`
+    : "https://curius.app";
+  const feedDescription = userHandle
+    ? `The curius network feed for ${userHandle} and their connections within the network (distance <= ${order})`
+    : "The global curius network feed";
 
-    return new NextResponse(rss, {
-      headers: { "Content-Type": "application/rss+xml; charset=utf-8" },
-    });
+  switch (format) {
+    case "rss": {
+      const rss = generateRssFeed({
+        title: feedTitle,
+        link: feedLink,
+        description: feedDescription,
+        items: feed.map((item) => ({
+          title: item.title ?? "Untitled",
+          link: item.link,
+          description: item.snippet ?? "",
+          pubDate: new Date(item.modifiedDate),
+          guid: { value: `curius-${item.id}` },
+        })),
+      });
+
+      return new NextResponse(rss, {
+        headers: { "Content-Type": "application/rss+xml; charset=utf-8" },
+      });
+    }
+
+    case "atom": {
+      const atom = generateAtomFeed({
+        id: feedLink,
+        title: feedTitle,
+        updated: feed.length > 0 ? new Date(feed[0].modifiedDate) : new Date(),
+        links: [
+          { href: `${feedLink}/feed.xml`, rel: "self" },
+          { href: feedLink, rel: "alternate" },
+        ],
+        entries: feed.map((item) => ({
+          id: `curius-${item.id}`,
+          title: item.title ?? "Untitled",
+          updated: new Date(item.modifiedDate),
+          content: item.snippet ?? "",
+          links: [{ href: item.link }],
+        })),
+      });
+
+      return new NextResponse(atom, {
+        headers: { "Content-Type": "application/atom+xml; charset=utf-8" },
+      });
+    }
+
+    case "jsonfeed": {
+      const jsonFeed = generateJsonFeed({
+        title: feedTitle,
+        home_page_url: feedLink,
+        feed_url: `${feedLink}/feed.json`,
+        items: feed.map((item) => ({
+          id: `curius-${item.id}`,
+          url: item.link,
+          title: item.title ?? "Untitled",
+          content_text: item.snippet ?? "",
+          date_published: new Date(item.modifiedDate),
+        })),
+      }) as string;
+
+      return new NextResponse(jsonFeed, {
+        headers: { "Content-Type": "application/feed+json; charset=utf-8" },
+      });
+    }
+
+    default:
+      return NextResponse.json(feed);
   }
-
-  return NextResponse.json(feed);
 }

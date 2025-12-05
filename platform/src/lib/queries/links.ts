@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { linksTable, savedLinksTable } from "../../db/schema";
-import { desc, sql, and, inArray } from "drizzle-orm";
+import { desc, sql, and, inArray, eq } from "drizzle-orm";
 
 /** Raw database link type */
 export type DbLink = {
@@ -48,7 +48,7 @@ export async function getLinksByUserIds(
 
   if (userIds.length === 0) return [];
 
-  const userCondition = inArray(linksTable.createdBy, userIds);
+  const userCondition = inArray(savedLinksTable.userId, userIds);
   const searchCondition = search?.trim()
     ? buildSearchCondition(search.trim())
     : undefined;
@@ -58,8 +58,9 @@ export async function getLinksByUserIds(
     : userCondition;
 
   return db
-    .select(linkSelectFields)
+    .selectDistinct(linkSelectFields)
     .from(linksTable)
+    .innerJoin(savedLinksTable, eq(linksTable.id, savedLinksTable.linkId))
     .where(whereCondition)
     .orderBy(desc(linksTable.modifiedDate))
     .limit(limit);
