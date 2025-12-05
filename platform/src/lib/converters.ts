@@ -90,7 +90,6 @@ export function contentToDb(
     : null;
 
   // Parse dates (they come as strings from API)
-  const createdDate = new Date(content.createdDate);
   const modifiedDate = new Date(content.modifiedDate);
   const lastCrawled = content.lastCrawled
     ? new Date(content.lastCrawled)
@@ -103,8 +102,6 @@ export function contentToDb(
     snippet: content.snippet ?? "",
     fulltext,
     createdBy: content.createdBy ?? fallbackCreatedBy,
-    createdDate,
-    modifiedDate,
     lastCrawled,
     metadata: cleanMetadata,
   };
@@ -129,16 +126,14 @@ export function contentToDbUpdate(
       )
     : null;
 
-  const modifiedDate = new Date(content.modifiedDate);
   const lastCrawled = content.lastCrawled
     ? new Date(content.lastCrawled)
-    : modifiedDate;
+    : null;
 
   return {
     title: content.title,
     snippet: content.snippet ?? "",
     fulltext,
-    modifiedDate,
     lastCrawled,
     metadata: cleanMetadata,
   };
@@ -147,6 +142,10 @@ export function contentToDbUpdate(
 /**
  * Create a saved link insert from user id and link id
  */
-export function savedLinkToDb(userId: number, linkId: number): SavedLinkInsert {
-  return { userId, linkId };
+export function savedLinkToDb(
+  userId: number,
+  linkId: number,
+  linkCreatedAt: Date,
+): SavedLinkInsert {
+  return { userId, linkId, timestamp: linkCreatedAt };
 }

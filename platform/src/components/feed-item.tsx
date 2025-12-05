@@ -88,9 +88,7 @@ export function FeedItem({ item }: FeedItemProps) {
           <span>From your network</span>
         )}
         <span className="mx-1">/</span>
-        <span>
-          {formatDate(new Date(item.modifiedDate || item.createdDate))}
-        </span>
+        <span>{formatDate(new Date(item.timestamp))}</span>
       </div>
 
       {/* Title */}

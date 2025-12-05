@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { linksTable, savedLinksTable } from "../../db/schema";
-import { desc, sql, and, inArray, eq } from "drizzle-orm";
+import { desc, sql, inArray, eq } from "drizzle-orm";
 
 /** Raw database link type */
 export type DbLink = {
@@ -9,23 +9,11 @@ export type DbLink = {
   title: string;
   snippet: string;
   createdBy: number;
-  createdDate: Date;
-  modifiedDate: Date;
-  lastCrawled: Date;
+  timestamp: Date;
+  savedBy: number;
+  lastCrawled: Date | null;
   metadata: unknown;
 };
-
-export const linkSelectFields = {
-  id: linksTable.id,
-  link: linksTable.link,
-  title: linksTable.title,
-  snippet: linksTable.snippet,
-  createdBy: linksTable.createdBy,
-  createdDate: linksTable.createdDate,
-  modifiedDate: linksTable.modifiedDate,
-  lastCrawled: linksTable.lastCrawled,
-  metadata: linksTable.metadata,
-} as const;
 
 export type GetLinksOptions = {
   limit: number;
@@ -40,6 +28,31 @@ function buildSearchCondition(search: string) {
   ) @@ websearch_to_tsquery('english', ${search})`;
 }
 
+/**
+ * Creates a subquery that gets the latest save per link.
+ * Uses DISTINCT ON (linkId) to deduplicate, ordered by timestamp desc.
+ */
+function createLatestSavesSubquery(userIds?: number[]) {
+  const baseQuery = db
+    .selectDistinctOn([savedLinksTable.linkId], {
+      linkId: savedLinksTable.linkId,
+      timestamp: savedLinksTable.timestamp,
+      savedBy: savedLinksTable.userId,
+    })
+    .from(savedLinksTable);
+
+  if (userIds && userIds.length > 0) {
+    return baseQuery
+      .where(inArray(savedLinksTable.userId, userIds))
+      .orderBy(savedLinksTable.linkId, desc(savedLinksTable.timestamp))
+      .as("latest_saves");
+  }
+
+  return baseQuery
+    .orderBy(savedLinksTable.linkId, desc(savedLinksTable.timestamp))
+    .as("latest_saves");
+}
+
 export async function getLinksByUserIds(
   userIds: number[],
   options: GetLinksOptions,
@@ -48,22 +61,34 @@ export async function getLinksByUserIds(
 
   if (userIds.length === 0) return [];
 
-  const userCondition = inArray(savedLinksTable.userId, userIds);
+  // Subquery: get the latest save per link from specified users
+  const latestSaves = createLatestSavesSubquery(userIds);
+
+  const query = db
+    .select({
+      id: linksTable.id,
+      link: linksTable.link,
+      title: linksTable.title,
+      snippet: linksTable.snippet,
+      createdBy: linksTable.createdBy,
+      lastCrawled: linksTable.lastCrawled,
+      metadata: linksTable.metadata,
+      timestamp: latestSaves.timestamp,
+      savedBy: latestSaves.savedBy,
+    })
+    .from(latestSaves)
+    .innerJoin(linksTable, eq(latestSaves.linkId, linksTable.id))
+    .$dynamic();
+
   const searchCondition = search?.trim()
     ? buildSearchCondition(search.trim())
     : undefined;
 
-  const whereCondition = searchCondition
-    ? and(userCondition, searchCondition)
-    : userCondition;
+  if (searchCondition) {
+    query.where(searchCondition);
+  }
 
-  return db
-    .selectDistinct(linkSelectFields)
-    .from(linksTable)
-    .innerJoin(savedLinksTable, eq(linksTable.id, savedLinksTable.linkId))
-    .where(whereCondition)
-    .orderBy(desc(linksTable.modifiedDate))
-    .limit(limit);
+  return query.orderBy(desc(latestSaves.timestamp)).limit(limit);
 }
 
 export async function getGlobalLinks(
@@ -71,17 +96,34 @@ export async function getGlobalLinks(
 ): Promise<DbLink[]> {
   const { limit, search } = options;
 
+  // Subquery: get the latest save per link (across all users)
+  const latestSaves = createLatestSavesSubquery();
+
+  const query = db
+    .select({
+      id: linksTable.id,
+      link: linksTable.link,
+      title: linksTable.title,
+      snippet: linksTable.snippet,
+      createdBy: linksTable.createdBy,
+      lastCrawled: linksTable.lastCrawled,
+      metadata: linksTable.metadata,
+      timestamp: latestSaves.timestamp,
+      savedBy: latestSaves.savedBy,
+    })
+    .from(latestSaves)
+    .innerJoin(linksTable, eq(latestSaves.linkId, linksTable.id))
+    .$dynamic();
+
   const searchCondition = search?.trim()
     ? buildSearchCondition(search.trim())
     : undefined;
-
-  const query = db.select(linkSelectFields).from(linksTable).$dynamic();
 
   if (searchCondition) {
     query.where(searchCondition);
   }
 
-  return query.orderBy(desc(linksTable.modifiedDate)).limit(limit);
+  return query.orderBy(desc(latestSaves.timestamp)).limit(limit);
 }
 
 export type SavedLinkRelation = {

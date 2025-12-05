@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
           title: item.title ?? "Untitled",
           link: item.link,
           description: item.snippet ?? "",
-          pubDate: new Date(item.modifiedDate),
+          pubDate: new Date(item.timestamp),
           guid: { value: `curius-${item.id}` },
         })),
       });
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       const atom = generateAtomFeed({
         id: feedLink,
         title: feedTitle,
-        updated: feed.length > 0 ? new Date(feed[0].modifiedDate) : new Date(),
+        updated: feed.length > 0 ? new Date(feed[0].timestamp) : new Date(),
         links: [
           { href: `${feedLink}/feed.xml`, rel: "self" },
           { href: feedLink, rel: "alternate" },
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
         entries: feed.map((item) => ({
           id: `curius-${item.id}`,
           title: item.title ?? "Untitled",
-          updated: new Date(item.modifiedDate),
+          updated: new Date(item.timestamp),
           content: item.snippet ?? "",
           links: [{ href: item.link }],
         })),
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
           url: item.link,
           title: item.title ?? "Untitled",
           content_text: item.snippet ?? "",
-          date_published: new Date(item.modifiedDate),
+          date_published: new Date(item.timestamp),
         })),
       }) as string;
 

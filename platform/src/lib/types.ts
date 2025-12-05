@@ -42,12 +42,11 @@ export type Content = {
   snippet: string | null;
   toRead: boolean | null;
   createdBy: number | null;
-  createdDate: string;
-  modifiedDate: string;
   lastCrawled: string | null;
   metadata: unknown;
   highlights: unknown[];
   userIds: number[] | null;
+  timestamp: string;
   savedBy: FollowWithOrder[] | null;
 };
 

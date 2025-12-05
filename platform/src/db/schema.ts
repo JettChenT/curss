@@ -20,9 +20,7 @@ export const linksTable = pgTable(
     createdBy: integer()
       .notNull()
       .references(() => usersTable.id),
-    createdDate: timestamp().notNull(),
-    modifiedDate: timestamp().notNull(),
-    lastCrawled: timestamp().notNull(),
+    lastCrawled: timestamp(),
     metadata: jsonb(),
   },
   (table) => [
@@ -74,6 +72,7 @@ export const savedLinksTable = pgTable(
     linkId: integer()
       .notNull()
       .references(() => linksTable.id),
+    timestamp: timestamp().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.linkId] }),

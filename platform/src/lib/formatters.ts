@@ -66,13 +66,12 @@ export function serializeFeedItem(
     snippet: link.snippet,
     toRead: null,
     createdBy: link.createdBy,
-    createdDate: link.createdDate.toISOString(),
-    modifiedDate: link.modifiedDate.toISOString(),
     lastCrawled: link.lastCrawled?.toISOString() ?? null,
     metadata: link.metadata,
     highlights: [],
     userIds: savedByUserIds,
     savedBy,
+    timestamp: link.timestamp.toISOString(),
   };
 }
 

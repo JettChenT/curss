@@ -14,9 +14,8 @@ import {
   userFollowsToDb,
   contentToDb,
   contentToDbUpdate,
-  savedLinkToDb,
 } from "./converters";
-import { max, inArray } from "drizzle-orm";
+import { max } from "drizzle-orm";
 
 export const syncDB = () =>
   Effect.gen(function* () {
@@ -94,28 +93,13 @@ export const syncDB = () =>
 
         // Upsert follows (user's following list)
         if (profile.followingUsers.length > 0) {
-          // First ensure all followed users exist in the users table
-          const followingUserIds = profile.followingUsers.map((f) => f.id);
-          const existingFollowedUsers = await db
-            .select({ id: usersTable.id })
-            .from(usersTable)
-            .where(inArray(usersTable.id, followingUserIds));
-          const existingFollowedUserIds = new Set(
-            existingFollowedUsers.map((u) => u.id),
-          );
+          // Insert minimal user records for followed users (ignore conflicts)
+          await db
+            .insert(usersTable)
+            .values(profile.followingUsers.map(followingUserToDb))
+            .onConflictDoNothing();
 
-          // Insert minimal user records for followed users that don't exist
-          const missingFollowedUsers = profile.followingUsers.filter(
-            (f) => !existingFollowedUserIds.has(f.id),
-          );
-          if (missingFollowedUsers.length > 0) {
-            await db
-              .insert(usersTable)
-              .values(missingFollowedUsers.map(followingUserToDb))
-              .onConflictDoNothing();
-          }
-
-          // Upsert follow relationships
+          // Insert follow relationships
           await db
             .insert(followsTable)
             .values(userFollowsToDb(profile))
@@ -141,7 +125,11 @@ export const syncDB = () =>
           // Insert saved link relationship
           await db
             .insert(savedLinksTable)
-            .values(savedLinkToDb(user.id, link.id))
+            .values({
+              linkId: link.id,
+              userId: user.id,
+              timestamp: new Date(link.createdDate),
+            })
             .onConflictDoNothing();
         }
 
