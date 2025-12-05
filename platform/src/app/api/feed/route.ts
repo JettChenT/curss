@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       targetUserIds = [user.id];
     } else {
       graph = await getFollowGraph(user.id, order);
-      targetUserIds = await getUserIdsWithinDistance(user.id, order);
+      targetUserIds = await getUserIdsWithinDistance(user.id, order, true);
 
       if (targetUserIds.length === 0) {
         return NextResponse.json([]);
