@@ -55,8 +55,10 @@ function formatDate(date: Date): string {
 export function FeedItem({ item }: FeedItemProps) {
   const savedBy = item.savedBy ?? [];
   return (
-    <div className="rounded-lg border p-4 hover:shadow-sm transition">
-      {/* Meta: who/when */}
+    <div
+      className="rounded-lg border p-4 hover:shadow-sm transition"
+      data-item-id={item.id}
+    >
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
         {savedBy.length > 0 ? (
           <div className="flex items-center gap-1">

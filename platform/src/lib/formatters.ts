@@ -37,7 +37,10 @@ export function serializeFeedItem(
 ): Content {
   const { usersMap, savedByUserIds, getOrder } = options;
 
-  const savedBy: FollowWithOrder[] = savedByUserIds
+  // Filter out createdBy from savedByUserIds so we can add them at the front
+  const filteredUserIds = savedByUserIds.filter((x) => x !== link.savedBy);
+
+  const savedBy: FollowWithOrder[] = filteredUserIds
     .map((uid) => {
       const u = usersMap.get(uid);
       if (!u) return null;
@@ -48,16 +51,16 @@ export function serializeFeedItem(
     })
     .filter((x): x is FollowWithOrder => x !== null);
 
-  if (link.createdBy && !savedByUserIds.includes(link.createdBy)) {
-    const creator = usersMap.get(link.createdBy);
+  // Always add createdBy user at index 0
+  if (link.savedBy) {
+    const creator = usersMap.get(link.savedBy);
     if (creator) {
       savedBy.unshift({
         followingUser: serializeFollowingUser(creator),
-        order: getOrder(link.createdBy),
+        order: getOrder(link.savedBy),
       });
     }
   }
-
   return {
     id: link.id,
     link: link.link,
