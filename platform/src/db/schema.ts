@@ -36,15 +36,22 @@ export const linksTable = pgTable(
   ],
 );
 
-export const usersTable = pgTable("users", {
-  id: integer().primaryKey(),
-  firstName: text().notNull(),
-  lastName: text().notNull(),
-  userLink: text().notNull(),
-  lastOnline: timestamp().notNull(),
-  numFollowers: integer().notNull(),
-  profileMetadata: jsonb(),
-});
+export const usersTable = pgTable(
+  "users",
+  {
+    id: integer().primaryKey(),
+    firstName: text().notNull(),
+    lastName: text().notNull(),
+    userLink: text().notNull(),
+    lastOnline: timestamp().notNull(),
+    numFollowers: integer().notNull(),
+    profileMetadata: jsonb(),
+  },
+  (table) => [
+    index("num_followers_idx").on(table.numFollowers.desc()),
+    index("idx_users_on_userlink").on(table.userLink),
+  ],
+);
 
 export const followsTable = pgTable(
   "users_follows",
