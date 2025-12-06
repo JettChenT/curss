@@ -14,7 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: false,
           },
         },
-      })
+      }),
   );
 
   return (
@@ -23,4 +23,3 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </ThemeProvider>
   );
 }
-

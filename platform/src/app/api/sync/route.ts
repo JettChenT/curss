@@ -1,8 +1,6 @@
-import { Effect } from "effect";
-import { FetchHttpClient } from "@effect/platform";
-import { syncDB } from "../../../lib/sync";
-import { CuriusAPIService } from "../../../lib/curius";
 import { headers } from "next/headers";
+import { start } from "workflow/api";
+import { syncWorkflow } from "@/app/workflows/sync-workflow";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -23,22 +21,6 @@ async function verifyAuth(): Promise<boolean> {
   return false;
 }
 
-async function runSync() {
-  const result = await Effect.runPromise(
-    syncDB().pipe(
-      Effect.provide(CuriusAPIService.Default),
-      Effect.provide(FetchHttpClient.layer),
-    ),
-  );
-
-  return {
-    success: true,
-    processed: result.processed,
-    errors: result.errors,
-    errorDetails: result.errorDetails,
-  };
-}
-
 // GET handler for Vercel cron jobs
 export async function GET() {
   const isAuthed = await verifyAuth();
@@ -47,8 +29,8 @@ export async function GET() {
   }
 
   try {
-    const result = await runSync();
-    return Response.json(result);
+    await start(syncWorkflow);
+    return Response.json({ message: "Sync started" });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown error occurred";

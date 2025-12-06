@@ -6,6 +6,7 @@ import {
   jsonb,
   primaryKey,
   index,
+  vector,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -22,6 +23,7 @@ export const linksTable = pgTable(
       .references(() => usersTable.id),
     lastCrawled: timestamp(),
     metadata: jsonb(),
+    embedding_qwen8b: vector("embedding_qwen8b", { dimensions: 1024 }),
   },
   (table) => [
     index("links_created_by_idx").on(table.createdBy),
@@ -32,6 +34,10 @@ export const linksTable = pgTable(
         setweight(to_tsvector('english', ${table.snippet}), 'B') ||
         setweight(to_tsvector('english', coalesce(${table.fulltext}, '')), 'C')
       )`,
+    ),
+    index("embedding_qwen8b_index").using(
+      "hnsw",
+      table.embedding_qwen8b.op("vector_cosine_ops"),
     ),
   ],
 );
