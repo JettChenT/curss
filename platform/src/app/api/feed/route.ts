@@ -8,7 +8,7 @@ import {
 } from "@/lib/queries/links";
 import {
   getFollowGraph,
-  getUserIdsWithinDistance,
+  getUserIdsFromGraph,
   getUserOrders,
   getUsersAtOrder,
 } from "@/lib/graph";
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       targetUserIds = [user.id];
     } else {
       graph = await getFollowGraph(user.id, order);
-      targetUserIds = await getUserIdsWithinDistance(user.id, order, true);
+      targetUserIds = getUserIdsFromGraph(graph, true);
 
       if (targetUserIds.length === 0) {
         return NextResponse.json([]);

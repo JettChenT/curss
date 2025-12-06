@@ -54,12 +54,10 @@ export async function getFollowGraph(
   return { rootUserId: userId, userIdsByOrder };
 }
 
-export async function getUserIdsWithinDistance(
-  userId: number,
-  maxOrder: number,
+export function getUserIdsFromGraph(
+  graph: FollowGraph,
   includeRoot = false,
-): Promise<number[]> {
-  const graph = await getFollowGraph(userId, maxOrder);
+): number[] {
   const result: number[] = [];
 
   for (const [order, ids] of graph.userIdsByOrder) {
@@ -68,6 +66,15 @@ export async function getUserIdsWithinDistance(
   }
 
   return result;
+}
+
+export async function getUserIdsWithinDistance(
+  userId: number,
+  maxOrder: number,
+  includeRoot = false,
+): Promise<number[]> {
+  const graph = await getFollowGraph(userId, maxOrder);
+  return getUserIdsFromGraph(graph, includeRoot);
 }
 
 export function getUserOrders(graph: FollowGraph): Map<number, number> {

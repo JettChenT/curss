@@ -48,7 +48,7 @@ export const usersTable = pgTable(
     profileMetadata: jsonb(),
   },
   (table) => [
-    index("num_followers_idx").on(table.numFollowers.desc()),
+    index("num_followers_idx").on(table.numFollowers),
     index("idx_users_on_userlink").on(table.userLink),
   ],
 );
