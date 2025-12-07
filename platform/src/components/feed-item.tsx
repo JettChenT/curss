@@ -56,16 +56,16 @@ export function FeedItem({ item }: FeedItemProps) {
   const savedBy = item.savedBy ?? [];
   return (
     <div
-      className="rounded-lg border p-4 hover:shadow-sm transition"
+      className="rounded-lg border p-3 md:p-4 hover:shadow-sm transition"
       data-item-id={item.id}
     >
-      <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mb-1.5 md:mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {savedBy.length > 0 ? (
           <div className="flex items-center gap-1">
             <span className="inline-flex size-5 items-center justify-center rounded-full bg-secondary text-[10px] font-medium">
               {savedBy.length}
             </span>
-            <span>
+            <span className="truncate">
               <a
                 href={`/?user=${encodeURIComponent(savedBy[0].followingUser.userLink)}&degree=0`}
                 className="hover:underline"
@@ -83,13 +83,13 @@ export function FeedItem({ item }: FeedItemProps) {
                   </a>
                 </>
               )}
-              {savedBy.length > 2 && `, and ${savedBy.length - 2} more`}
+              {savedBy.length > 2 && `, +${savedBy.length - 2}`}
             </span>
           </div>
         ) : (
           <span>From your network</span>
         )}
-        <span className="mx-1">/</span>
+        <span className="hidden sm:inline mx-1">/</span>
         <span>{formatDate(new Date(item.timestamp))}</span>
       </div>
 
@@ -98,13 +98,13 @@ export function FeedItem({ item }: FeedItemProps) {
         href={item.link}
         target="_blank"
         rel="noreferrer"
-        className="text-lg font-semibold leading-snug hover:underline"
+        className="text-base md:text-lg font-semibold leading-snug hover:underline"
       >
         {item.title}
       </a>
 
       {/* Domain */}
-      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+      <div className="mt-1 flex items-center gap-1.5 text-xs md:text-[13px] text-muted-foreground">
         {(() => {
           const faviconUrl = getFaviconUrl(item.link);
           return faviconUrl ? (
@@ -113,24 +113,26 @@ export function FeedItem({ item }: FeedItemProps) {
               alt=""
               width={16}
               height={16}
-              className="size-4 rounded-sm"
+              className="size-4 rounded-sm shrink-0"
               unoptimized
             />
           ) : null;
         })()}
-        {(() => {
-          try {
-            const url = new URL(item.link);
-            return url.hostname.replace(/^www\./, "");
-          } catch {
-            return item.link;
-          }
-        })()}
+        <span className="truncate">
+          {(() => {
+            try {
+              const url = new URL(item.link);
+              return url.hostname.replace(/^www\./, "");
+            } catch {
+              return item.link;
+            }
+          })()}
+        </span>
       </div>
 
       {/* Snippet */}
       {item.snippet ? (
-        <p className="mt-2 text-sm text-muted-foreground/90 line-clamp-3">
+        <p className="mt-1.5 md:mt-2 text-sm text-muted-foreground/90 line-clamp-2 md:line-clamp-3">
           {item.snippet}
         </p>
       ) : null}

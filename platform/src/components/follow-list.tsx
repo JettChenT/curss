@@ -17,7 +17,7 @@ export function FollowList({ items, onSelect }: FollowListProps) {
   }
 
   return (
-    <ul className="space-y-2 pr-1">
+    <ul className="space-y-1 md:space-y-2 pr-1">
       {items.map((f) => {
         const u = f.followingUser;
         const raw = u.userLink ?? "";
@@ -40,24 +40,24 @@ export function FollowList({ items, onSelect }: FollowListProps) {
         return (
           <li
             key={String(u.id)}
-            className="flex items-center justify-between cursor-pointer rounded px-2 py-1 hover:bg-accent"
+            className="flex items-center justify-between cursor-pointer rounded px-2 py-2 md:py-1 hover:bg-accent active:bg-accent/80"
             onClick={() => onSelect?.(u)}
           >
-            <div>
-              <div className="font-medium">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium truncate">
                 {u.firstName} {u.lastName}
               </div>
               <a
                 href={href}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary hover:underline truncate block"
                 onClick={(e) => e.stopPropagation()}
               >
                 {`curius.app/${handleNoAt}`}
               </a>
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground ml-2 shrink-0">
               {String(f.order)}°
             </span>
           </li>
