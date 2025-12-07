@@ -9,11 +9,18 @@ import {
   Suspense,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Command } from "cmdk";
+import { Map } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { SubscribeButton } from "@/components/ui/subscribe-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSearchUsers } from "@/lib/hooks/use-search-users";
 import { useFeed } from "@/lib/hooks/use-feed";
 import { useFollowList } from "@/lib/hooks/use-follow-list";
@@ -267,7 +274,22 @@ function HomeContent() {
             ) : (
               /* Global Feed Mode */
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Global Curius Feed</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Global Curius Feed</h2>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href="/map"
+                        className="inline-flex items-center justify-center h-7 w-7 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <Map className="h-4 w-4" />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Map of Curius</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <SubscribeButton rssUrl={rssUrl} />
               </div>
             )}
