@@ -11,7 +11,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Command } from "cmdk";
-import { Map } from "lucide-react";
+import { MapIcon, Info, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ function HomeContent() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [linkSearch, setLinkSearch] = useState("");
   const [debouncedLinkSearch, setDebouncedLinkSearch] = useState("");
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // Get all users for lookup and display
   const { data: allUsersData, isLoading: allUsersLoading } = useAllUsers();
@@ -276,19 +277,74 @@ function HomeContent() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Global Curius Feed</h2>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href="/map"
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
-                      >
-                        <Map className="h-4 w-4" />
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Map of Curius</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setIsInfoOpen(!isInfoOpen)}
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>About</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {isInfoOpen && (
+                        <div className="absolute right-0 top-full mt-2 z-50 bg-popover text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
+                          <div className="flex justify-between items-start mb-3">
+                            <h3 className="font-semibold text-sm">
+                              About Curss
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => setIsInfoOpen(false)}
+                              className="text-muted-foreground hover:text-foreground -mt-1 -mr-1"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            This is a feed of all links saved on{" "}
+                            <a
+                              href="https://curius.app"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Curius
+                            </a>
+                            . Browse what people are reading, filter by user,
+                            and search the corpus.
+                          </p>
+                          <a
+                            href="https://github.com/JettChenT/curss"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                          >
+                            View on GitHub →
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href="/map"
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          <MapIcon className="h-4 w-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Map of Curius</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
                 <SubscribeButton rssUrl={rssUrl} />
               </div>

@@ -4,6 +4,10 @@ import pandas as pd
 from io import BytesIO
 import umap
 from vercel.blob import BlobClient
+import modal
+
+img = modal.Image.debian_slim().uv_sync()
+app = modal.App(name="viz", image=img)
 
 BLOB_OUTPUT_PATH = "viz/all_links.parquet"
 
@@ -24,6 +28,9 @@ def viz_data():
     return export_df
 
 
+@app.function(
+    schedule=modal.Period(days=1), secrets=[modal.Secret.from_name("curss-viz")]
+)
 def run_viz_and_export():
     df = viz_data()
     client = BlobClient()

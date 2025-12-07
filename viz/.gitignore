@@ -1,2 +1,3 @@
 *.ipynb
 *.parquet
+__pycache__/
