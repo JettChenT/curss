@@ -6,6 +6,9 @@ import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   title: "Curius Feed",
   description: "Explore your Curius network feed",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

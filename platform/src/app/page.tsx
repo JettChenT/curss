@@ -217,10 +217,9 @@ function RightPanel({
                 min={0}
                 max={2}
                 step={1}
-                value={[Math.min(2, Math.max(0, degree))]}
+                value={[degree]}
                 onValueChange={(v) => {
-                  const newDegree = Math.min(2, Math.max(0, v?.[0] ?? 0));
-                  setDegreeParam(newDegree);
+                  setDegreeParam(v?.[0] ?? 0);
                 }}
               />
               <p className="text-xs text-muted-foreground">
@@ -261,7 +260,7 @@ function RightPanel({
                     </TooltipContent>
                   </Tooltip>
                   {isInfoOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-50 bg-popover text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
+                    <div className="absolute right-0 top-full mt-2 z-50 bg-popover/90 text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
                       <div className="flex justify-between items-start mb-3">
                         <h3 className="font-semibold text-sm">About Curss</h3>
                         <button
@@ -285,13 +284,19 @@ function RightPanel({
                         . Browse what people are reading, filter by user, and
                         search the corpus.
                       </p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Also check out{" "}
+                        <a href="/map" className="text-primary hover:underline">
+                          Map of Curius!
+                        </a>
+                      </p>
                       <a
                         href="https://github.com/JettChenT/curss"
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
                       >
-                        View on GitHub →
+                        GitHub →
                       </a>
                     </div>
                   )}
@@ -448,6 +453,17 @@ function HomeContent() {
     return allUsersList.find((u) => u.userLink === userHandle) ?? null;
   }, [userHandle, allUsersList]);
 
+  // Dynamic page title
+  useEffect(() => {
+    if (userHandle && selectedUser) {
+      document.title = `${selectedUser.firstName}'s Curius Feed`;
+    } else if (userHandle) {
+      document.title = `${userHandle}'s Curius Feed`;
+    } else {
+      document.title = "Global Curius Feed";
+    }
+  }, [userHandle, selectedUser]);
+
   // Debounce link search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -603,7 +619,7 @@ function HomeContent() {
                       </TooltipContent>
                     </Tooltip>
                     {isInfoOpen && (
-                      <div className="absolute right-0 top-full mt-2 z-50 bg-popover text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
+                      <div className="absolute right-0 top-full mt-2 z-50 bg-popover/90 text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
                         <div className="flex justify-between items-start mb-3">
                           <h3 className="font-semibold text-sm">About Curss</h3>
                           <button
@@ -627,13 +643,22 @@ function HomeContent() {
                           . Browse what people are reading, filter by user, and
                           search the corpus.
                         </p>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Also check out{" "}
+                          <a
+                            href="/map"
+                            className="text-primary hover:underline"
+                          >
+                            Map of Curius!
+                          </a>
+                        </p>
                         <a
                           href="https://github.com/JettChenT/curss"
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
                         >
-                          View on GitHub →
+                          GitHub →
                         </a>
                       </div>
                     )}

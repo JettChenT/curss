@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Info, Home, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,16 +28,21 @@ const EmbeddingAtlasView = dynamic<{ parquetUrl: string }>(
 );
 
 export default function MapPage() {
-  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(true);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Map of Curius";
+  }, []);
 
   return (
     <div className="relative h-screen w-full">
       <EmbeddingAtlasView parquetUrl={PARQUET_URL} />
 
       {/* Floating Info Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-8 right-6 z-50">
         {isInfoOpen ? (
-          <div className="bg-popover text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
+          <div className="bg-popover/80 text-popover-foreground border rounded-lg shadow-lg p-4 w-72 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
             <div className="flex justify-between items-start mb-3">
               <h3 className="font-semibold text-sm">Map of Curius</h3>
               <button
@@ -58,7 +63,19 @@ export default function MapPage() {
               >
                 Curius
               </a>
-              , arranged by semantic similarity using embeddings.
+              , generated with{" "}
+              <a
+                href="https://huggingface.co/Qwen/Qwen3-Embedding-8B"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline"
+              >
+                Qwen 3 Embedding 8B
+              </a>{" "}
+              and UMAP.
+              <br />
+              <br />
+              Please use a chrome-based desktop browser.
             </p>
             <Button asChild className="w-full" size="sm">
               <Link href="/">

@@ -14,7 +14,7 @@ BLOB_OUTPUT_PATH = "viz/all_links.parquet"
 
 def viz_data():
     data = pd.read_sql(
-        "SELECT id,link,title,snippet,embedding_qwen8b FROM links WHERE embedding_qwen8b IS NOT NULL",
+        "SELECT id,link,title,embedding_qwen8b FROM links WHERE embedding_qwen8b IS NOT NULL",
         con=os.getenv("DB_URL"),
     )
     print(f"Loaded {len(data)} rows from DB")
@@ -22,7 +22,7 @@ def viz_data():
     raw_embeddings = [eval(emb) for emb in data["embedding_qwen8b"].tolist()]
     mapper = reducer.fit(raw_embeddings)
     print("UMAP DONE!")
-    export_df = data[["id", "link", "title", "snippet"]].copy()
+    export_df = data[["id", "link", "title"]].copy()
     export_df["projection_x"] = mapper.embedding_[:, 0]
     export_df["projection_y"] = mapper.embedding_[:, 1]
     return export_df
@@ -44,4 +44,4 @@ def run_viz_and_export():
 
 
 if __name__ == "__main__":
-    run_viz_and_export()
+    run_viz_and_export.remote()
