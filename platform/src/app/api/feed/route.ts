@@ -155,9 +155,9 @@ export async function GET(request: NextRequest) {
           content_text: item.snippet ?? "",
           date_published: new Date(item.timestamp),
         })),
-      }) as string;
+      });
 
-      return new NextResponse(jsonFeed, {
+      return new NextResponse(JSON.stringify(jsonFeed), {
         headers: { "Content-Type": "application/feed+json; charset=utf-8" },
       });
     }

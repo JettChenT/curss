@@ -3,6 +3,7 @@
 import type { Content } from "@/lib/types";
 import humanizeDuration from "humanize-duration";
 import Image from "next/image";
+import Link from "next/link";
 
 function getFaviconUrl(feedUrl: string): string | undefined {
   try {
@@ -54,10 +55,17 @@ function formatDate(date: Date): string {
 
 export function FeedItem({ item }: FeedItemProps) {
   const savedBy = item.savedBy ?? [];
+
+  const handleCardClick = () => {
+    window.open(item.link, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <div
-      className="rounded-lg border p-3 md:p-4 hover:shadow-sm transition"
+    <button
+      type="button"
+      className="w-full text-left rounded-lg border p-3 md:p-4 hover:shadow-sm transition cursor-pointer"
       data-item-id={item.id}
+      onClick={handleCardClick}
     >
       <div className="mb-1.5 md:mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {savedBy.length > 0 ? (
@@ -66,21 +74,23 @@ export function FeedItem({ item }: FeedItemProps) {
               {savedBy.length}
             </span>
             <span className="truncate">
-              <a
+              <Link
                 href={`/?user=${encodeURIComponent(savedBy[0].followingUser.userLink)}&degree=0`}
                 className="hover:underline"
+                onClick={(e) => e.stopPropagation()}
               >
                 {savedBy[0].followingUser.firstName}
-              </a>
+              </Link>
               {savedBy.length > 1 && (
                 <>
                   {", "}
-                  <a
+                  <Link
                     href={`/?user=${encodeURIComponent(savedBy[1].followingUser.userLink)}&degree=0`}
                     className="hover:underline"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {savedBy[1].followingUser.firstName}
-                  </a>
+                  </Link>
                 </>
               )}
               {savedBy.length > 2 && `, +${savedBy.length - 2}`}
@@ -94,14 +104,9 @@ export function FeedItem({ item }: FeedItemProps) {
       </div>
 
       {/* Title */}
-      <a
-        href={item.link}
-        target="_blank"
-        rel="noreferrer"
-        className="text-base md:text-lg font-semibold leading-snug hover:underline"
-      >
+      <h3 className="text-base md:text-lg font-semibold leading-snug">
         {item.title}
-      </a>
+      </h3>
 
       {/* Domain */}
       <div className="mt-1 flex items-center gap-1.5 text-xs md:text-[13px] text-muted-foreground">
@@ -136,6 +141,6 @@ export function FeedItem({ item }: FeedItemProps) {
           {item.snippet}
         </p>
       ) : null}
-    </div>
+    </button>
   );
 }
