@@ -6,7 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Curius Feed",
-  description: "Explore your Curius network feed",
+  description: "Global Feed & Embedding Atlas of all links on Curius",
   icons: {
     icon: "/favicon.svg",
   },
