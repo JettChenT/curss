@@ -51,7 +51,7 @@ export type Content = {
 };
 
 // Top Stories types
-export type TopStoriesPeriod = "day" | "week" | "month" | "year";
+export type TopStoriesPeriod = "day" | "week" | "month" | "year" | "custom";
 
 export type TopStory = {
   id: number;

@@ -3,29 +3,39 @@
 import { useQuery } from "@tanstack/react-query";
 import type { TopStoriesPeriod, TopStoriesResponse } from "@/lib/types";
 
+type UseTopStoriesParams = {
+  date: string;
+  period: TopStoriesPeriod;
+  limit?: number;
+  customStart?: string;
+  customEnd?: string;
+};
+
 async function fetchTopStories(
-  date: string,
-  period: TopStoriesPeriod,
-  limit: number,
+  params: UseTopStoriesParams,
 ): Promise<TopStoriesResponse> {
-  const params = new URLSearchParams({
-    date,
-    period,
-    limit: String(limit),
+  const searchParams = new URLSearchParams({
+    period: params.period,
+    limit: String(params.limit ?? 30),
   });
-  const res = await fetch(`/api/top-stories?${params}`);
+
+  if (params.period === "custom" && params.customStart && params.customEnd) {
+    searchParams.set("start", params.customStart);
+    searchParams.set("end", params.customEnd);
+  } else {
+    searchParams.set("date", params.date);
+  }
+
+  const res = await fetch(`/api/top-stories?${searchParams}`);
   if (!res.ok) throw new Error("Failed to fetch top stories");
   return res.json();
 }
 
-export function useTopStories(
-  date: string,
-  period: TopStoriesPeriod = "day",
-  limit = 30,
-) {
+export function useTopStories(params: UseTopStoriesParams) {
+  const { date, period, limit = 30, customStart, customEnd } = params;
   return useQuery<TopStoriesResponse>({
-    queryKey: ["top-stories", date, period, limit],
-    queryFn: () => fetchTopStories(date, period, limit),
+    queryKey: ["top-stories", date, period, limit, customStart, customEnd],
+    queryFn: () => fetchTopStories(params),
     refetchInterval: 60000,
   });
 }
