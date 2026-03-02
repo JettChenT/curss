@@ -72,6 +72,24 @@ export type TopStoriesResponse = {
   stories: TopStory[];
 };
 
+export function topStoryToContent(story: TopStory): Content {
+  return {
+    id: story.id,
+    link: story.link,
+    title: story.title,
+    favorite: false,
+    snippet: story.snippet,
+    toRead: null,
+    createdBy: story.createdBy,
+    lastCrawled: story.lastCrawled,
+    metadata: story.metadata,
+    highlights: [],
+    userIds: story.savedBy.map((s) => s.followingUser.id),
+    timestamp: story.latestSave,
+    savedBy: story.savedBy,
+  };
+}
+
 // API Response types
 export type AllUsersResponse = {
   users: User[];
