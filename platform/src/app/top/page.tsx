@@ -3,7 +3,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Rss } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { FeedItem } from "@/components/feed-item";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,42 @@ function todayUTC(): string {
 
 function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function toLocalDate(dateStr: string): Date {
+  return new Date(`${dateStr}T12:00:00`);
+}
+
+function computePeriodRange(
+  dateStr: string,
+  period: TopStoriesPeriod,
+): { from: Date; to: Date } {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const day = d.getDate();
+
+  switch (period) {
+    case "week": {
+      const dow = d.getDay();
+      const mondayOffset = dow === 0 ? -6 : 1 - dow;
+      const monday = new Date(y, m, day + mondayOffset, 12);
+      const sunday = new Date(y, m, day + mondayOffset + 6, 12);
+      return { from: monday, to: sunday };
+    }
+    case "month": {
+      const first = new Date(y, m, 1, 12);
+      const last = new Date(y, m + 1, 0, 12);
+      return { from: first, to: last };
+    }
+    case "year": {
+      const first = new Date(y, 0, 1, 12);
+      const last = new Date(y, 11, 31, 12);
+      return { from: first, to: last };
+    }
+    default:
+      return { from: d, to: d };
+  }
 }
 
 function shiftDate(
@@ -181,19 +217,18 @@ function TopStoriesContent() {
   const customStartParam = searchParams.get("start") ?? todayUTC();
   const customEndParam = searchParams.get("end") ?? todayUTC();
 
-  const [customRange, setCustomRange] = useState<DateRange | undefined>(() => ({
-    from: new Date(`${customStartParam}T12:00:00`),
-    to: new Date(`${customEndParam}T12:00:00`),
-  }));
+  const isCustom = period === "custom";
 
-  useEffect(() => {
-    if (period === "custom") {
-      setCustomRange({
-        from: new Date(`${customStartParam}T12:00:00`),
-        to: new Date(`${customEndParam}T12:00:00`),
-      });
+  const displayedRange: DateRange = useMemo(() => {
+    if (isCustom) {
+      return {
+        from: toLocalDate(customStartParam),
+        to: toLocalDate(customEndParam),
+      };
     }
-  }, [period, customStartParam, customEndParam]);
+    const { from, to } = computePeriodRange(dateParam, period);
+    return { from, to };
+  }, [isCustom, customStartParam, customEndParam, dateParam, period]);
 
   const [limit] = useState(30);
 
@@ -201,11 +236,9 @@ function TopStoriesContent() {
     date: dateParam,
     period,
     limit,
-    customStart: period === "custom" ? customStartParam : undefined,
-    customEnd: period === "custom" ? customEndParam : undefined,
+    customStart: isCustom ? customStartParam : undefined,
+    customEnd: isCustom ? customEndParam : undefined,
   });
-
-  const isCustom = period === "custom";
 
   const navigateDate = useCallback(
     (direction: number) => {
@@ -231,33 +264,25 @@ function TopStoriesContent() {
 
   function setPeriod(p: TopStoriesPeriod) {
     if (p === "custom") {
-      const start = customRange?.from
-        ? toDateStr(customRange.from)
+      const start = displayedRange.from
+        ? toDateStr(displayedRange.from)
         : todayUTC();
-      const end = customRange?.to ? toDateStr(customRange.to) : start;
-      const params = new URLSearchParams({
-        period: "custom",
-        start,
-        end,
-      });
-      router.push(`/top?${params}`);
+      const end = displayedRange.to ? toDateStr(displayedRange.to) : start;
+      router.push(
+        `/top?${new URLSearchParams({ period: "custom", start, end })}`,
+      );
     } else {
       router.push(buildUrl(dateParam, p));
     }
   }
 
-  function handleCustomRangeSelect(range: DateRange | undefined) {
-    setCustomRange(range);
-    if (range?.from) {
-      const start = toDateStr(range.from);
-      const end = range.to ? toDateStr(range.to) : start;
-      const params = new URLSearchParams({
-        period: "custom",
-        start,
-        end,
-      });
-      router.push(`/top?${params}`);
-    }
+  function handleCalendarSelect(range: DateRange | undefined) {
+    if (!range?.from) return;
+    const start = toDateStr(range.from);
+    const end = range.to ? toDateStr(range.to) : start;
+    router.push(
+      `/top?${new URLSearchParams({ period: "custom", start, end })}`,
+    );
   }
 
   function goToCurrent() {
@@ -288,10 +313,13 @@ function TopStoriesContent() {
     return () => window.removeEventListener("keydown", handleKeyNav);
   }, [handleKeyNav]);
 
-  const customDateLabel =
-    customStartParam === customEndParam
+  const dateLabel = isCustom
+    ? customStartParam === customEndParam
       ? formatShortDate(customStartParam)
-      : `${formatShortDate(customStartParam)} – ${formatShortDate(customEndParam)}`;
+      : `${formatShortDate(customStartParam)} – ${formatShortDate(customEndParam)}`
+    : isCurrentPeriod
+      ? currentLabel(period)
+      : formatDisplayDate(dateParam, period);
 
   const storiesColumn = (
     <div className="flex-1 min-h-0 overflow-auto space-y-2 md:space-y-3">
@@ -349,7 +377,7 @@ function TopStoriesContent() {
     </div>
   );
 
-  const dateNav = (
+  const dateNav = !isCustom ? (
     <div className="flex items-center justify-between gap-1">
       <Button
         variant="outline"
@@ -364,9 +392,7 @@ function TopStoriesContent() {
         onClick={goToCurrent}
         className="flex-1 text-center text-sm font-medium tabular-nums hover:text-primary transition-colors"
       >
-        {isCurrentPeriod
-          ? currentLabel(period)
-          : formatDisplayDate(dateParam, period)}
+        {dateLabel}
       </button>
       <Button
         variant="outline"
@@ -378,58 +404,52 @@ function TopStoriesContent() {
         <ChevronRight className="size-4" />
       </Button>
     </div>
-  );
-
-  const calendarPicker = (
-    <div className="flex flex-col items-center">
-      <div className="text-sm text-muted-foreground mb-1">
-        {customDateLabel}
-      </div>
-      <Calendar
-        mode="range"
-        selected={customRange}
-        onSelect={handleCustomRangeSelect}
-        disabled={{ after: new Date() }}
-        numberOfMonths={1}
-        className="rounded-lg border"
-      />
+  ) : (
+    <div className="text-center text-sm font-medium tabular-nums">
+      {dateLabel}
     </div>
   );
 
+  const calendarWidget = (
+    <Calendar
+      mode="range"
+      selected={displayedRange}
+      onSelect={handleCalendarSelect}
+      disabled={{ after: new Date() }}
+      numberOfMonths={1}
+      defaultMonth={displayedRange.from}
+      className="rounded-lg border w-full"
+    />
+  );
+
   const controlsPanel = (
-    <>
-      <div className="shrink-0 mb-3 md:mb-4">
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2.5">
-            <Flame className="size-5 text-orange-500" />
-            <h2 className="text-lg font-semibold">Top Stories</h2>
-          </div>
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-3.5" />
-            Feed
-          </Link>
+    <div className="shrink-0 space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <Flame className="size-5 text-orange-500" />
+          <h2 className="text-lg font-semibold">Top Stories</h2>
         </div>
-
-        <div className="space-y-4">
-          <div>
-            <div className="text-sm text-muted-foreground mb-2">Period</div>
-            {periodTabs}
-          </div>
-
-          {isCustom ? (
-            calendarPicker
-          ) : (
-            <div>
-              <div className="text-sm text-muted-foreground mb-2">Date</div>
-              {dateNav}
-            </div>
-          )}
-        </div>
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          Feed
+        </Link>
       </div>
-    </>
+
+      <div>
+        <div className="text-sm text-muted-foreground mb-2">Period</div>
+        {periodTabs}
+      </div>
+
+      <div>
+        <div className="text-sm text-muted-foreground mb-2">Date</div>
+        {dateNav}
+      </div>
+
+      {calendarWidget}
+    </div>
   );
 
   return (
@@ -454,7 +474,7 @@ function TopStoriesContent() {
 
         <div className="shrink-0 mb-3 space-y-2">
           {periodTabs}
-          {isCustom ? calendarPicker : dateNav}
+          {dateNav}
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col">{storiesColumn}</div>
@@ -465,7 +485,7 @@ function TopStoriesContent() {
         <div className="col-span-7 lg:col-span-8 h-full min-h-0 flex flex-col">
           {storiesColumn}
         </div>
-        <div className="col-span-5 lg:col-span-4 h-full min-h-0 flex flex-col overflow-auto">
+        <div className="col-span-5 lg:col-span-4 h-full min-h-0 overflow-auto">
           {controlsPanel}
         </div>
       </div>
