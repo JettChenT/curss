@@ -51,6 +51,8 @@ export type Content = {
 };
 
 // Top Stories types
+export type TopStoriesPeriod = "day" | "week" | "month" | "year";
+
 export type TopStory = {
   id: number;
   link: string;
@@ -66,6 +68,7 @@ export type TopStory = {
 
 export type TopStoriesResponse = {
   date: string;
+  period: TopStoriesPeriod;
   stories: TopStory[];
 };
 
