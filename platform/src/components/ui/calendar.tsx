@@ -15,10 +15,10 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("p-3 w-full", className)}
       classNames={{
-        months: "flex flex-col sm:flex-row gap-2",
-        month: "flex flex-col gap-4",
+        months: "flex flex-col gap-2 w-full",
+        month: "flex flex-col gap-4 w-full",
         month_caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         nav: "flex items-center gap-1",
@@ -31,23 +31,23 @@ function Calendar({
           "size-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1",
         ),
         month_grid: "w-full border-collapse space-y-1",
-        weekdays: "flex",
+        weekdays: "flex w-full",
         weekday:
-          "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
+          "text-muted-foreground flex-1 text-center font-normal text-[0.8rem]",
         week: "flex w-full mt-2",
         day: cn(
-          "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50",
+          "relative flex-1 p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50",
         ),
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "size-8 p-0 font-normal aria-selected:opacity-100",
+          "w-full h-9 p-0 font-normal aria-selected:opacity-100 rounded-none",
         ),
         range_start:
           "day-range-start rounded-l-md aria-selected:bg-primary aria-selected:text-primary-foreground",
         range_end:
           "day-range-end rounded-r-md aria-selected:bg-primary aria-selected:text-primary-foreground",
         selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-md",
         today: "bg-accent text-accent-foreground",
         outside:
           "day-outside text-muted-foreground aria-selected:text-muted-foreground",
