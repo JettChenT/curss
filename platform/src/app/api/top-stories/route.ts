@@ -8,6 +8,10 @@ import {
 import { getUsersMap } from "@/lib/queries/users";
 import type { TopStoriesResponse, TopStory } from "@/lib/types";
 
+type Period = "day" | "week" | "month" | "year";
+
+const VALID_PERIODS = new Set<Period>(["day", "week", "month", "year"]);
+
 function parseDateParam(dateStr: string | null): Date {
   if (dateStr) {
     const parsed = new Date(`${dateStr}T00:00:00Z`);
@@ -19,22 +23,61 @@ function parseDateParam(dateStr: string | null): Date {
   );
 }
 
+function getDateRange(
+  anchorDate: Date,
+  period: Period,
+): { start: Date; end: Date } {
+  const y = anchorDate.getUTCFullYear();
+  const m = anchorDate.getUTCMonth();
+  const d = anchorDate.getUTCDate();
+
+  switch (period) {
+    case "week": {
+      const dow = anchorDate.getUTCDay();
+      const mondayOffset = dow === 0 ? -6 : 1 - dow;
+      const start = new Date(Date.UTC(y, m, d + mondayOffset));
+      const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+      return { start, end };
+    }
+    case "month": {
+      const start = new Date(Date.UTC(y, m, 1));
+      const end = new Date(Date.UTC(y, m + 1, 1));
+      return { start, end };
+    }
+    case "year": {
+      const start = new Date(Date.UTC(y, 0, 1));
+      const end = new Date(Date.UTC(y + 1, 0, 1));
+      return { start, end };
+    }
+    default: {
+      const start = new Date(Date.UTC(y, m, d));
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+      return { start, end };
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const dateParam = searchParams.get("date");
+  const periodParam = searchParams.get("period") ?? "day";
+  const period: Period = VALID_PERIODS.has(periodParam as Period)
+    ? (periodParam as Period)
+    : "day";
   const limit = Math.min(
     Math.max(parseInt(searchParams.get("limit") ?? "30", 10), 1),
     100,
   );
 
-  const startDate = parseDateParam(dateParam);
-  const endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+  const anchorDate = parseDateParam(dateParam);
+  const { start: startDate, end: endDate } = getDateRange(anchorDate, period);
 
   const topRows = await getTopStoriesByDate(startDate, endDate, limit);
 
   if (topRows.length === 0) {
     const response: TopStoriesResponse = {
       date: startDate.toISOString().slice(0, 10),
+      period,
       stories: [],
     };
     return NextResponse.json(response);
@@ -91,6 +134,7 @@ export async function GET(request: NextRequest) {
 
   const response: TopStoriesResponse = {
     date: startDate.toISOString().slice(0, 10),
+    period,
     stories,
   };
 
