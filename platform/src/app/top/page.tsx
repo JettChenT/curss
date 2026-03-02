@@ -3,7 +3,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Rss } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { FeedItem } from "@/components/feed-item";
 import { Button } from "@/components/ui/button";
 import { useTopStories } from "@/lib/hooks/use-top-stories";
@@ -163,18 +163,25 @@ function TopStoriesContent() {
   const [limit] = useState(30);
   const { data, isLoading } = useTopStories(dateParam, period, limit);
 
+  const navigateDate = useCallback(
+    (direction: number) => {
+      const newDate = shiftDate(dateParam, direction, period);
+      if (newDate > todayUTC()) return;
+      const params = new URLSearchParams();
+      if (newDate !== todayUTC()) params.set("date", newDate);
+      if (period !== "day") params.set("period", period);
+      const qs = params.toString();
+      router.push(`/top${qs ? `?${qs}` : ""}`);
+    },
+    [dateParam, period, router],
+  );
+
   function buildUrl(date: string, p: TopStoriesPeriod) {
     const params = new URLSearchParams();
     if (date !== todayUTC()) params.set("date", date);
     if (p !== "day") params.set("period", p);
     const qs = params.toString();
     return `/top${qs ? `?${qs}` : ""}`;
-  }
-
-  function navigateDate(direction: number) {
-    const newDate = shiftDate(dateParam, direction, period);
-    if (newDate > todayUTC()) return;
-    router.push(buildUrl(newDate, period));
   }
 
   function setPeriod(p: TopStoriesPeriod) {
@@ -187,6 +194,24 @@ function TopStoriesContent() {
 
   const isCurrentPeriod = isCurrent(dateParam, period);
   const isFutureBlocked = shiftDate(dateParam, 1, period) > todayUTC();
+
+  const handleKeyNav = useCallback(
+    (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.key === "ArrowLeft" || e.key === "h") navigateDate(-1);
+      if (e.key === "ArrowRight" || e.key === "l") navigateDate(1);
+    },
+    [navigateDate],
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyNav);
+    return () => window.removeEventListener("keydown", handleKeyNav);
+  }, [handleKeyNav]);
 
   const storiesColumn = (
     <div className="flex-1 min-h-0 overflow-auto space-y-2 md:space-y-3">
