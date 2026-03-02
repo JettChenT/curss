@@ -103,34 +103,33 @@ export async function GET(request: NextRequest) {
 
   const usersMap = await getUsersMap([...allUserIds]);
 
-  const stories: TopStory[] = topRows
-    .map((row) => {
-      const link = linksMap.get(row.linkId);
-      if (!link) return null;
+  const stories: TopStory[] = [];
+  for (const row of topRows) {
+    const link = linksMap.get(row.linkId);
+    if (!link) continue;
 
-      const saverIds = savedByMap.get(row.linkId) ?? [];
-      const savedBy = saverIds
-        .map((uid) => {
-          const u = usersMap.get(uid);
-          if (!u) return null;
-          return { followingUser: serializeFollowingUser(u), order: 0 };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null);
+    const saverIds = savedByMap.get(row.linkId) ?? [];
+    const savedBy = saverIds
+      .map((uid) => {
+        const u = usersMap.get(uid);
+        if (!u) return null;
+        return { followingUser: serializeFollowingUser(u), order: 0 };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
 
-      return {
-        id: link.id,
-        link: link.link,
-        title: link.title,
-        snippet: link.snippet,
-        createdBy: link.createdBy,
-        lastCrawled: link.lastCrawled?.toISOString() ?? null,
-        metadata: link.metadata,
-        saveCount: row.saveCount,
-        latestSave: new Date(row.latestSave).toISOString(),
-        savedBy,
-      };
-    })
-    .filter((x): x is TopStory => x !== null);
+    stories.push({
+      id: link.id,
+      link: link.link,
+      title: link.title,
+      snippet: link.snippet,
+      createdBy: link.createdBy,
+      lastCrawled: link.lastCrawled?.toISOString() ?? null,
+      metadata: link.metadata,
+      saveCount: row.saveCount,
+      latestSave: new Date(row.latestSave).toISOString(),
+      savedBy,
+    });
+  }
 
   const response: TopStoriesResponse = {
     date: startDate.toISOString().slice(0, 10),
