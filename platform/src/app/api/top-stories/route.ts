@@ -8,9 +8,15 @@ import {
 import { getUsersMap } from "@/lib/queries/users";
 import type { TopStoriesResponse, TopStory } from "@/lib/types";
 
-type Period = "day" | "week" | "month" | "year";
+type Period = "day" | "week" | "month" | "year" | "custom";
 
-const VALID_PERIODS = new Set<Period>(["day", "week", "month", "year"]);
+const VALID_PERIODS = new Set<Period>([
+  "day",
+  "week",
+  "month",
+  "year",
+  "custom",
+]);
 
 function parseDateParam(dateStr: string | null): Date {
   if (dateStr) {
@@ -69,8 +75,21 @@ export async function GET(request: NextRequest) {
     100,
   );
 
-  const anchorDate = parseDateParam(dateParam);
-  const { start: startDate, end: endDate } = getDateRange(anchorDate, period);
+  let startDate: Date;
+  let endDate: Date;
+
+  if (period === "custom") {
+    const startParam = searchParams.get("start");
+    const endParam = searchParams.get("end");
+    startDate = parseDateParam(startParam);
+    const parsedEnd = parseDateParam(endParam);
+    endDate = new Date(parsedEnd.getTime() + 24 * 60 * 60 * 1000);
+  } else {
+    const anchorDate = parseDateParam(dateParam);
+    const range = getDateRange(anchorDate, period);
+    startDate = range.start;
+    endDate = range.end;
+  }
 
   const topRows = await getTopStoriesByDate(startDate, endDate, limit);
 

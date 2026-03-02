@@ -4,8 +4,10 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Rss } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { FeedItem } from "@/components/feed-item";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { useTopStories } from "@/lib/hooks/use-top-stories";
 import type { TopStoriesPeriod } from "@/lib/types";
 import { topStoryToContent } from "@/lib/types";
@@ -15,11 +17,16 @@ const PERIODS: { value: TopStoriesPeriod; label: string }[] = [
   { value: "week", label: "Week" },
   { value: "month", label: "Month" },
   { value: "year", label: "Year" },
+  { value: "custom", label: "Custom" },
 ];
 
 function todayUTC(): string {
   const d = new Date();
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function shiftDate(
@@ -132,9 +139,20 @@ function emptyLabel(period: TopStoriesPeriod): string {
       return "No stories this month.";
     case "year":
       return "No stories this year.";
+    case "custom":
+      return "No stories in this range.";
     default:
       return "No stories for this day.";
   }
+}
+
+function formatShortDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export default function TopStoriesPage() {
@@ -160,11 +178,38 @@ function TopStoriesContent() {
     ? periodParam
     : "day";
 
+  const customStartParam = searchParams.get("start") ?? todayUTC();
+  const customEndParam = searchParams.get("end") ?? todayUTC();
+
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(() => ({
+    from: new Date(`${customStartParam}T12:00:00`),
+    to: new Date(`${customEndParam}T12:00:00`),
+  }));
+
+  useEffect(() => {
+    if (period === "custom") {
+      setCustomRange({
+        from: new Date(`${customStartParam}T12:00:00`),
+        to: new Date(`${customEndParam}T12:00:00`),
+      });
+    }
+  }, [period, customStartParam, customEndParam]);
+
   const [limit] = useState(30);
-  const { data, isLoading } = useTopStories(dateParam, period, limit);
+
+  const { data, isLoading } = useTopStories({
+    date: dateParam,
+    period,
+    limit,
+    customStart: period === "custom" ? customStartParam : undefined,
+    customEnd: period === "custom" ? customEndParam : undefined,
+  });
+
+  const isCustom = period === "custom";
 
   const navigateDate = useCallback(
     (direction: number) => {
+      if (isCustom) return;
       const newDate = shiftDate(dateParam, direction, period);
       if (newDate > todayUTC()) return;
       const params = new URLSearchParams();
@@ -173,7 +218,7 @@ function TopStoriesContent() {
       const qs = params.toString();
       router.push(`/top${qs ? `?${qs}` : ""}`);
     },
-    [dateParam, period, router],
+    [dateParam, period, router, isCustom],
   );
 
   function buildUrl(date: string, p: TopStoriesPeriod) {
@@ -185,15 +230,44 @@ function TopStoriesContent() {
   }
 
   function setPeriod(p: TopStoriesPeriod) {
-    router.push(buildUrl(dateParam, p));
+    if (p === "custom") {
+      const start = customRange?.from
+        ? toDateStr(customRange.from)
+        : todayUTC();
+      const end = customRange?.to ? toDateStr(customRange.to) : start;
+      const params = new URLSearchParams({
+        period: "custom",
+        start,
+        end,
+      });
+      router.push(`/top?${params}`);
+    } else {
+      router.push(buildUrl(dateParam, p));
+    }
+  }
+
+  function handleCustomRangeSelect(range: DateRange | undefined) {
+    setCustomRange(range);
+    if (range?.from) {
+      const start = toDateStr(range.from);
+      const end = range.to ? toDateStr(range.to) : start;
+      const params = new URLSearchParams({
+        period: "custom",
+        start,
+        end,
+      });
+      router.push(`/top?${params}`);
+    }
   }
 
   function goToCurrent() {
+    if (isCustom) return;
     router.push(buildUrl(todayUTC(), period));
   }
 
-  const isCurrentPeriod = isCurrent(dateParam, period);
-  const isFutureBlocked = shiftDate(dateParam, 1, period) > todayUTC();
+  const isCurrentPeriod = !isCustom && isCurrent(dateParam, period);
+  const isFutureBlocked =
+    !isCustom && shiftDate(dateParam, 1, period) > todayUTC();
 
   const handleKeyNav = useCallback(
     (e: KeyboardEvent) => {
@@ -202,16 +276,22 @@ function TopStoriesContent() {
         e.target instanceof HTMLTextAreaElement
       )
         return;
+      if (isCustom) return;
       if (e.key === "ArrowLeft" || e.key === "h") navigateDate(-1);
       if (e.key === "ArrowRight" || e.key === "l") navigateDate(1);
     },
-    [navigateDate],
+    [navigateDate, isCustom],
   );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyNav);
     return () => window.removeEventListener("keydown", handleKeyNav);
   }, [handleKeyNav]);
+
+  const customDateLabel =
+    customStartParam === customEndParam
+      ? formatShortDate(customStartParam)
+      : `${formatShortDate(customStartParam)} – ${formatShortDate(customEndParam)}`;
 
   const storiesColumn = (
     <div className="flex-1 min-h-0 overflow-auto space-y-2 md:space-y-3">
@@ -227,7 +307,7 @@ function TopStoriesContent() {
         <div className="text-center py-16">
           <Rss className="size-8 mx-auto mb-3 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">{emptyLabel(period)}</p>
-          {!isCurrentPeriod && (
+          {!isCurrentPeriod && !isCustom && (
             <Button
               variant="link"
               size="sm"
@@ -250,6 +330,72 @@ function TopStoriesContent() {
     </div>
   );
 
+  const periodTabs = (
+    <div className="flex rounded-lg border bg-muted p-0.5 gap-0.5">
+      {PERIODS.map((p) => (
+        <button
+          key={p.value}
+          type="button"
+          onClick={() => setPeriod(p.value)}
+          className={`flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            period === p.value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const dateNav = (
+    <div className="flex items-center justify-between gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => navigateDate(-1)}
+        className="h-8 px-2"
+      >
+        <ChevronLeft className="size-4" />
+      </Button>
+      <button
+        type="button"
+        onClick={goToCurrent}
+        className="flex-1 text-center text-sm font-medium tabular-nums hover:text-primary transition-colors"
+      >
+        {isCurrentPeriod
+          ? currentLabel(period)
+          : formatDisplayDate(dateParam, period)}
+      </button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => navigateDate(1)}
+        disabled={isFutureBlocked}
+        className="h-8 px-2"
+      >
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  );
+
+  const calendarPicker = (
+    <div className="flex flex-col items-center">
+      <div className="text-sm text-muted-foreground mb-1">
+        {customDateLabel}
+      </div>
+      <Calendar
+        mode="range"
+        selected={customRange}
+        onSelect={handleCustomRangeSelect}
+        disabled={{ after: new Date() }}
+        numberOfMonths={1}
+        className="rounded-lg border"
+      />
+    </div>
+  );
+
   const controlsPanel = (
     <>
       <div className="shrink-0 mb-3 md:mb-4">
@@ -267,62 +413,20 @@ function TopStoriesContent() {
           </Link>
         </div>
 
-        {/* Period selector */}
         <div className="space-y-4">
           <div>
             <div className="text-sm text-muted-foreground mb-2">Period</div>
-            <div className="flex rounded-lg border bg-muted p-0.5 gap-0.5">
-              {PERIODS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPeriod(p.value)}
-                  className={`flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    period === p.value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            {periodTabs}
           </div>
 
-          {/* Date navigation */}
-          <div>
-            <div className="text-sm text-muted-foreground mb-2">Date</div>
-            <div className="flex items-center justify-between gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateDate(-1)}
-                className="h-8 px-2"
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-
-              <button
-                type="button"
-                onClick={goToCurrent}
-                className="flex-1 text-center text-sm font-medium tabular-nums hover:text-primary transition-colors"
-              >
-                {isCurrentPeriod
-                  ? currentLabel(period)
-                  : formatDisplayDate(dateParam, period)}
-              </button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateDate(1)}
-                disabled={isFutureBlocked}
-                className="h-8 px-2"
-              >
-                <ChevronRight className="size-4" />
-              </Button>
+          {isCustom ? (
+            calendarPicker
+          ) : (
+            <div>
+              <div className="text-sm text-muted-foreground mb-2">Date</div>
+              {dateNav}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </>
@@ -348,64 +452,20 @@ function TopStoriesContent() {
           </div>
         </div>
 
-        {/* Mobile controls */}
         <div className="shrink-0 mb-3 space-y-2">
-          <div className="flex rounded-lg border bg-muted p-0.5 gap-0.5">
-            {PERIODS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => setPeriod(p.value)}
-                className={`flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  period === p.value
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center justify-between gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate(-1)}
-              className="h-8 px-2"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <button
-              type="button"
-              onClick={goToCurrent}
-              className="flex-1 text-center text-sm font-medium tabular-nums hover:text-primary transition-colors"
-            >
-              {isCurrentPeriod
-                ? currentLabel(period)
-                : formatDisplayDate(dateParam, period)}
-            </button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate(1)}
-              disabled={isFutureBlocked}
-              className="h-8 px-2"
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+          {periodTabs}
+          {isCustom ? calendarPicker : dateNav}
         </div>
 
-        {/* Mobile stories */}
         <div className="flex-1 min-h-0 flex flex-col">{storiesColumn}</div>
       </div>
 
-      {/* Desktop Layout - mirrors homepage grid */}
+      {/* Desktop Layout */}
       <div className="hidden md:grid grid-cols-12 gap-8 h-full min-h-0 max-w-7xl mx-auto">
         <div className="col-span-7 lg:col-span-8 h-full min-h-0 flex flex-col">
           {storiesColumn}
         </div>
-        <div className="col-span-5 lg:col-span-4 h-full min-h-0 flex flex-col">
+        <div className="col-span-5 lg:col-span-4 h-full min-h-0 flex flex-col overflow-auto">
           {controlsPanel}
         </div>
       </div>
