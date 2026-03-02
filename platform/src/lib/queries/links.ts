@@ -1,6 +1,6 @@
-import { db } from "../db";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { linksTable, savedLinksTable } from "../../db/schema";
-import { desc, sql, inArray, eq } from "drizzle-orm";
+import { db } from "../db";
 
 /** Raw database link type */
 export type DbLink = {
@@ -143,6 +143,96 @@ export async function getSavedLinkRelations(
     })
     .from(savedLinksTable)
     .where(inArray(savedLinksTable.linkId, linkIds));
+}
+
+export type TopStoryRow = {
+  linkId: number;
+  saveCount: number;
+  latestSave: Date;
+};
+
+export async function getTopStoriesByDate(
+  startDate: Date,
+  endDate: Date,
+  limit: number,
+): Promise<TopStoryRow[]> {
+  const rows = await db
+    .select({
+      linkId: savedLinksTable.linkId,
+      saveCount: sql<number>`count(distinct ${savedLinksTable.userId})::int`,
+      latestSave: sql<Date>`max(${savedLinksTable.timestamp})`,
+    })
+    .from(savedLinksTable)
+    .where(
+      and(
+        gte(savedLinksTable.timestamp, startDate),
+        lt(savedLinksTable.timestamp, endDate),
+      ),
+    )
+    .groupBy(savedLinksTable.linkId)
+    .orderBy(
+      desc(sql`count(distinct ${savedLinksTable.userId})`),
+      desc(sql`max(${savedLinksTable.timestamp})`),
+    )
+    .limit(limit);
+
+  return rows as TopStoryRow[];
+}
+
+export async function getLinksByIds(ids: number[]): Promise<
+  {
+    id: number;
+    link: string;
+    title: string;
+    snippet: string;
+    createdBy: number;
+    lastCrawled: Date | null;
+    metadata: unknown;
+  }[]
+> {
+  if (ids.length === 0) return [];
+  return db
+    .select({
+      id: linksTable.id,
+      link: linksTable.link,
+      title: linksTable.title,
+      snippet: linksTable.snippet,
+      createdBy: linksTable.createdBy,
+      lastCrawled: linksTable.lastCrawled,
+      metadata: linksTable.metadata,
+    })
+    .from(linksTable)
+    .where(inArray(linksTable.id, ids));
+}
+
+export async function getSavedByForLinks(
+  linkIds: number[],
+  startDate: Date,
+  endDate: Date,
+): Promise<Map<number, number[]>> {
+  if (linkIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      linkId: savedLinksTable.linkId,
+      userId: savedLinksTable.userId,
+    })
+    .from(savedLinksTable)
+    .where(
+      and(
+        inArray(savedLinksTable.linkId, linkIds),
+        gte(savedLinksTable.timestamp, startDate),
+        lt(savedLinksTable.timestamp, endDate),
+      ),
+    );
+
+  const map = new Map<number, number[]>();
+  for (const { linkId, userId } of rows) {
+    const arr = map.get(linkId) ?? [];
+    arr.push(userId);
+    map.set(linkId, arr);
+  }
+  return map;
 }
 
 export async function getSavedByMap(

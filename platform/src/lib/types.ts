@@ -50,6 +50,25 @@ export type Content = {
   savedBy: FollowWithOrder[] | null;
 };
 
+// Top Stories types
+export type TopStory = {
+  id: number;
+  link: string;
+  title: string;
+  snippet: string | null;
+  createdBy: number;
+  lastCrawled: string | null;
+  metadata: unknown;
+  saveCount: number;
+  latestSave: string;
+  savedBy: FollowWithOrder[];
+};
+
+export type TopStoriesResponse = {
+  date: string;
+  stories: TopStory[];
+};
+
 // API Response types
 export type AllUsersResponse = {
   users: User[];

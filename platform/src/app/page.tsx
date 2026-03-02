@@ -12,7 +12,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Command } from "cmdk";
-import { MapIcon, Info, X, Newspaper, Users } from "lucide-react";
+import { MapIcon, Info, X, Newspaper, Users, Flame } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -301,6 +301,19 @@ function RightPanel({
                     </div>
                   )}
                 </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="/top"
+                      className="inline-flex items-center justify-center h-7 w-7 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <Flame className="h-4 w-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Top Stories</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Link
@@ -663,6 +676,19 @@ function HomeContent() {
                       </div>
                     )}
                   </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href="/top"
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <Flame className="h-4 w-4" />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Top Stories</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link
