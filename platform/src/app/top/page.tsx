@@ -3,11 +3,19 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Flame, Rss } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import type { DateRange } from "react-day-picker";
+import {
+  type HTMLAttributes,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { CalendarMonth as CalendarMonthType, DateRange } from "react-day-picker";
 import { FeedItem } from "@/components/feed-item";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import { useTopStories } from "@/lib/hooks/use-top-stories";
 import type { TopStoriesPeriod } from "@/lib/types";
 import { topStoryToContent } from "@/lib/types";
@@ -191,6 +199,73 @@ function formatShortDate(dateStr: string): string {
   });
 }
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function MonthYearPicker({
+  currentMonth,
+  onSelect,
+}: {
+  currentMonth: Date;
+  onSelect: (month: Date) => void;
+}) {
+  const [year, setYear] = useState(currentMonth.getFullYear());
+  const now = new Date();
+
+  return (
+    <div className="p-3">
+      <div className="flex items-center justify-between mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setYear((y) => y - 1)}
+          className="size-7 p-0"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <span className="text-sm font-medium">{year}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setYear((y) => y + 1)}
+          disabled={year >= now.getFullYear()}
+          className="size-7 p-0"
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {MONTH_LABELS.map((label, i) => {
+          const isDisabled =
+            year === now.getFullYear() && i > now.getMonth();
+          const isCurrent =
+            year === currentMonth.getFullYear() &&
+            i === currentMonth.getMonth();
+          return (
+            <button
+              key={label}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => onSelect(new Date(year, i, 1))}
+              className={cn(
+                "py-2 rounded-md text-sm transition-colors",
+                isCurrent
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent",
+                isDisabled && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function TopStoriesPage() {
   return (
     <Suspense
@@ -229,6 +304,24 @@ function TopStoriesContent() {
     const { from, to } = computePeriodRange(dateParam, period);
     return { from, to };
   }, [isCustom, customStartParam, customEndParam, dateParam, period]);
+
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    () => new Date(
+      (displayedRange.from ?? new Date()).getFullYear(),
+      (displayedRange.from ?? new Date()).getMonth(),
+      1,
+    ),
+  );
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+  useEffect(() => {
+    if (displayedRange.from) {
+      setCalendarMonth(
+        new Date(displayedRange.from.getFullYear(), displayedRange.from.getMonth(), 1),
+      );
+      setShowMonthPicker(false);
+    }
+  }, [displayedRange.from]);
 
   const [limit] = useState(30);
 
@@ -276,13 +369,19 @@ function TopStoriesContent() {
     }
   }
 
-  function handleCalendarSelect(range: DateRange | undefined) {
+  function handleCalendarRangeSelect(range: DateRange | undefined) {
     if (!range?.from) return;
     const start = toDateStr(range.from);
     const end = range.to ? toDateStr(range.to) : start;
     router.push(
       `/top?${new URLSearchParams({ period: "custom", start, end })}`,
     );
+  }
+
+  function handleCalendarDaySelect(day: Date | undefined) {
+    if (!day) return;
+    const dateStr = toDateStr(day);
+    router.push(buildUrl(dateStr, period));
   }
 
   function goToCurrent() {
@@ -410,14 +509,82 @@ function TopStoriesContent() {
     </div>
   );
 
-  const calendarWidget = (
+  const clickableCaption = useMemo(
+    () =>
+      function ClickableMonthCaption(
+        props: {
+          calendarMonth: CalendarMonthType;
+          displayIndex: number;
+        } & HTMLAttributes<HTMLDivElement>,
+      ) {
+        const { calendarMonth: cm, displayIndex: _, ...rest } = props;
+        return (
+          <div {...rest}>
+            <button
+              type="button"
+              onClick={() => setShowMonthPicker(true)}
+              className="text-sm font-medium hover:text-primary transition-colors cursor-pointer"
+            >
+              {cm.date.toLocaleDateString(undefined, {
+                month: "long",
+                year: "numeric",
+              })}
+            </button>
+          </div>
+        );
+      },
+    [],
+  );
+
+  const periodRangeModifiers =
+    !isCustom && period !== "day" && displayedRange.from && displayedRange.to
+      ? {
+          modifiers: {
+            periodRange: {
+              from: displayedRange.from,
+              to: displayedRange.to,
+            },
+          },
+          modifiersClassNames: {
+            periodRange:
+              "bg-accent text-accent-foreground rounded-none aria-selected:bg-accent",
+          },
+        }
+      : {};
+
+  const calendarWidget = showMonthPicker ? (
+    <div className="rounded-lg border w-full">
+      <MonthYearPicker
+        currentMonth={calendarMonth}
+        onSelect={(m) => {
+          setCalendarMonth(m);
+          setShowMonthPicker(false);
+        }}
+      />
+    </div>
+  ) : isCustom ? (
     <Calendar
       mode="range"
       selected={displayedRange}
-      onSelect={handleCalendarSelect}
+      onSelect={handleCalendarRangeSelect}
       disabled={{ after: new Date() }}
       numberOfMonths={1}
-      defaultMonth={displayedRange.from}
+      month={calendarMonth}
+      onMonthChange={setCalendarMonth}
+      components={{ MonthCaption: clickableCaption }}
+      className="rounded-lg border w-full"
+    />
+  ) : (
+    <Calendar
+      mode="single"
+      selected={period === "day" ? displayedRange.from : undefined}
+      onSelect={handleCalendarDaySelect}
+      disabled={{ after: new Date() }}
+      numberOfMonths={1}
+      month={calendarMonth}
+      onMonthChange={setCalendarMonth}
+      components={{ MonthCaption: clickableCaption }}
+      {...periodRangeModifiers}
       className="rounded-lg border w-full"
     />
   );
